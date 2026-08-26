@@ -35,14 +35,9 @@
       line-height:1.5;
     }
 
-    a{
-      color:inherit;
-      text-decoration:none;
-    }
+    a{color:inherit;text-decoration:none}
 
-    button,input,select{
-      font:inherit;
-    }
+    button,input,select{font:inherit}
 
     .wrap{
       max-width:1120px;
@@ -66,9 +61,7 @@
       color:var(--cobalt);
     }
 
-    .brand span{
-      color:var(--orange);
-    }
+    .brand span{color:var(--orange)}
 
     nav{
       display:flex;
@@ -173,6 +166,41 @@
       outline:none;
     }
 
+    .manual-fields{
+      display:none;
+      margin-top:18px;
+      padding-top:18px;
+      border-top:1px solid var(--line);
+    }
+
+    .manual-fields.show{
+      display:block;
+    }
+
+    .manual-note{
+      font-size:13px;
+      color:#616A74;
+      margin:0 0 15px;
+    }
+
+    .manual-field{
+      margin-bottom:14px;
+    }
+
+    .manual-field input{
+      width:100%;
+      padding:14px 16px;
+      border:1px solid #CFC9BC;
+      border-radius:13px;
+      background:white;
+      color:var(--ink);
+      outline:none;
+    }
+
+    .manual-field input:focus{
+      border-color:var(--cobalt);
+    }
+
     .primary{
       width:100%;
       border:0;
@@ -271,9 +299,7 @@
       margin:10px 0;
     }
 
-    .fake-line.short{
-      width:62%;
-    }
+    .fake-line.short{width:62%}
 
     .price{
       font-family:var(--serif);
@@ -293,9 +319,7 @@
       border-top:1px solid var(--line);
     }
 
-    .center{
-      text-align:center;
-    }
+    .center{text-align:center}
 
     .eyebrow{
       font-size:12px;
@@ -360,9 +384,7 @@
       padding-top:18px;
     }
 
-    .estimate-result.show{
-      display:block;
-    }
+    .estimate-result.show{display:block}
 
     .result-title{
       font-family:var(--serif);
@@ -419,9 +441,7 @@
       text-align:center;
     }
 
-    .final-cta h2{
-      color:white;
-    }
+    .final-cta h2{color:white}
 
     .final-cta p{
       color:#E9EDF8;
@@ -439,22 +459,17 @@
     }
 
     @media(max-width:820px){
-      nav{
-        display:none;
-      }
 
-      .hero{
-        padding-top:45px;
-      }
+      nav{display:none}
+
+      .hero{padding-top:45px}
 
       .hero-grid{
         grid-template-columns:1fr;
         gap:40px;
       }
 
-      .visual{
-        min-height:320px;
-      }
+      .visual{min-height:320px}
 
       .blob{
         width:290px;
@@ -465,556 +480,742 @@
         grid-template-columns:1fr;
       }
 
-      h1{
-        font-size:58px;
-      }
+      h1{font-size:58px}
 
-      h2{
-        font-size:38px;
-      }
+      h2{font-size:38px}
     }
   </style>
 </head>
 
 <body>
 
-  <header class="wrap">
-    <a class="brand" href="#">
-      GET IT,<br><span>SEND IT.</span>
-    </a>
+<header class="wrap">
 
-    <nav>
-      <a href="#how">How it works</a>
-      <a href="#estimate">Estimate</a>
-      <a href="#faq">FAQs</a>
-    </nav>
+  <a class="brand" href="#">
+    GET IT,<br><span>SEND IT.</span>
+  </a>
 
-    <a class="top-cta" href="#estimate">Get an estimate</a>
-  </header>
+  <nav>
+    <a href="#how">How it works</a>
+    <a href="#estimate">Estimate</a>
+    <a href="#faq">FAQs</a>
+  </nav>
 
-  <main>
+  <a class="top-cta" href="#estimate">
+    Get an estimate
+  </a>
 
-    <section class="hero wrap" id="estimate">
-      <div class="hero-grid">
+</header>
 
-        <div>
 
-          <h1>
-            Can't buy it<br>
-            where you live?<br>
-            <em>Send us the link.</em>
-          </h1>
+<main>
 
-          <p class="lead">
-            You find it. We get it. See roughly what it will cost before you do anything else.
+<section class="hero wrap" id="estimate">
+
+  <div class="hero-grid">
+
+    <div>
+
+      <h1>
+        Can't buy it<br>
+        where you live?<br>
+        <em>Send us the link.</em>
+      </h1>
+
+      <p class="lead">
+        You find it. We get it. See roughly what it will cost before you do anything else.
+      </p>
+
+
+      <div class="estimate-card">
+
+        <div class="field-label">
+          Product link
+        </div>
+
+        <div class="url-row">
+          <input
+            id="url"
+            type="url"
+            placeholder="Paste the product link here"
+            autocomplete="off"
+          >
+        </div>
+
+
+        <div class="country">
+
+          <div class="field-label">
+            Deliver to
+          </div>
+
+          <select id="country">
+
+            <option value="US">🇺🇸 United States</option>
+            <option value="CA">🇨🇦 Canada</option>
+            <option value="AU">🇦🇺 Australia</option>
+            <option value="NZ">🇳🇿 New Zealand</option>
+            <option value="DE">🇩🇪 Germany</option>
+            <option value="FR">🇫🇷 France</option>
+            <option value="ES">🇪🇸 Spain</option>
+            <option value="NL">🇳🇱 Netherlands</option>
+            <option value="OTHER">🌍 Other</option>
+
+          </select>
+
+        </div>
+
+
+        <button class="primary" id="estimateBtn">
+          GET MY ESTIMATE →
+        </button>
+
+
+        <div class="tiny">
+          No account. No email. No obligation.
+        </div>
+
+
+        <div class="center">
+          <a class="demo" id="demo">
+            Try a demo product
+          </a>
+        </div>
+
+
+        <div class="error-message" id="errorMessage"></div>
+
+
+        <div class="manual-fields" id="manualFields">
+
+          <div class="field-label">
+            We need two details
+          </div>
+
+          <p class="manual-note">
+            We couldn't automatically retrieve all the product information from this retailer. Enter the figures shown on the retailer's website and we'll finish the estimate for you.
           </p>
 
-          <div class="estimate-card">
 
-            <div class="field-label">Product link</div>
+          <div class="manual-field">
 
-            <div class="url-row">
-              <input
-                id="url"
-                type="url"
-                placeholder="Paste the product link here"
-                autocomplete="off"
-              >
+            <div class="field-label">
+              Product price (£)
             </div>
 
-            <div class="country">
+            <input
+              id="manualProduct"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="e.g. 39.99"
+            >
 
-              <div class="field-label">Deliver to</div>
+          </div>
 
-              <select id="country">
-                <option value="US">🇺🇸 United States</option>
-                <option value="CA">🇨🇦 Canada</option>
-                <option value="AU">🇦🇺 Australia</option>
-                <option value="NZ">🇳🇿 New Zealand</option>
-                <option value="DE">🇩🇪 Germany</option>
-                <option value="FR">🇫🇷 France</option>
-                <option value="ES">🇪🇸 Spain</option>
-                <option value="NL">🇳🇱 Netherlands</option>
-                <option value="OTHER">🌍 Other</option>
-              </select>
 
+          <div class="manual-field">
+
+            <div class="field-label">
+              UK delivery to us (£)
             </div>
 
-            <button class="primary" id="estimateBtn">
-              GET MY ESTIMATE →
-            </button>
+            <input
+              id="manualDelivery"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="e.g. 4.99"
+            >
 
-            <div class="tiny">
-              No account. No email. No obligation.
+          </div>
+
+
+          <button
+            class="primary"
+            id="manualEstimateBtn"
+            type="button"
+          >
+            UPDATE MY ESTIMATE →
+          </button>
+
+        </div>
+
+
+        <div class="estimate-result" id="result">
+
+          <div class="result-title">
+            Your estimate
+          </div>
+
+
+          <div class="range" id="range">
+            £—
+          </div>
+
+
+          <div class="breakdown">
+
+            <div>
+              <span>Product</span>
+              <strong id="productCost">£—</strong>
             </div>
 
-            <div class="center">
-              <a class="demo" id="demo">Try a demo product</a>
+            <div>
+              <span>UK delivery</span>
+              <strong id="ukDelivery">£—</strong>
             </div>
 
-            <div class="error-message" id="errorMessage"></div>
+            <div>
+              <span>Get It, Send It</span>
+              <strong id="serviceFee">£—</strong>
+            </div>
 
-            <div class="estimate-result" id="result">
+            <div>
+              <span>International delivery</span>
+              <strong id="intlShipping">~£—</strong>
+            </div>
 
-              <div class="result-title">
-                Your estimate
-              </div>
-
-              <div class="range" id="range">
-                £—
-              </div>
-
-              <div class="breakdown">
-
-                <div>
-                  <span>Product</span>
-                  <strong id="productCost">£—</strong>
-                </div>
-
-                <div>
-                  <span>UK delivery</span>
-                  <strong id="ukDelivery">£—</strong>
-                </div>
-
-                <div>
-                  <span>Get It, Send It</span>
-                  <strong id="serviceFee">£—</strong>
-                </div>
-
-                <div>
-                  <span>International delivery</span>
-                  <strong id="intlShipping">~£—</strong>
-                </div>
-
-                <div>
-                  <span>Import charges</span>
-                  <strong>Not included</strong>
-                </div>
-
-              </div>
-
-              <div class="caveat">
-                This is an instant estimate. Import VAT, customs duty and carrier handling charges are not included and may be payable by the recipient when the parcel arrives.
-              </div>
-
+            <div>
+              <span>Import charges</span>
+              <strong>Not included</strong>
             </div>
 
           </div>
 
-        </div>
 
-        <div class="visual" aria-hidden="true">
-
-          <div class="blob"></div>
-
-          <div class="note">
-
-            <div class="note-top">
-              <div class="mini-label">GET IT, SEND IT.</div>
-              <div class="dot"></div>
-            </div>
-
-            <div class="mini-label">YOUR ESTIMATE</div>
-
-            <div class="fake-line"></div>
-            <div class="fake-line short"></div>
-            <div class="fake-line"></div>
-
-            <div class="price">
-              £84–£92 <span class="arrow">→</span>
-            </div>
-
-            <div class="mini-label">
-              NO EMAIL. NO WAITING.
-            </div>
-
+          <div class="caveat">
+            This is an instant estimate. Import VAT, customs duty and carrier handling charges are not included and may be payable by the recipient when the parcel arrives.
           </div>
 
         </div>
 
       </div>
-    </section>
+
+    </div>
 
 
-    <section class="intro" id="how">
+    <div class="visual" aria-hidden="true">
 
-      <div class="wrap center">
+      <div class="blob"></div>
 
-        <div class="eyebrow">
-          How it works
+      <div class="note">
+
+        <div class="note-top">
+
+          <div class="mini-label">
+            GET IT, SEND IT.
+          </div>
+
+          <div class="dot"></div>
+
         </div>
 
-        <h2>
-          Three simple steps.
-        </h2>
+        <div class="mini-label">
+          YOUR ESTIMATE
+        </div>
 
-        <p class="sub">
-          No account to create. No complicated forwarding service to learn. Just tell us what you want.
-        </p>
+        <div class="fake-line"></div>
+        <div class="fake-line short"></div>
+        <div class="fake-line"></div>
 
-        <div class="steps">
+        <div class="price">
+          £84–£92
+          <span class="arrow">→</span>
+        </div>
 
-          <article class="step">
-            <div class="num">01</div>
-
-            <h3>
-              Send us the link.
-            </h3>
-
-            <p>
-              You've found something you want. Paste the product link and tell us where it needs to go.
-            </p>
-          </article>
-
-
-          <article class="step">
-            <div class="num">02</div>
-
-            <h3>
-              Get your estimate.
-            </h3>
-
-            <p>
-              We'll show the likely cost of getting it to you, including our fee and international delivery.
-            </p>
-          </article>
-
-
-          <article class="step">
-            <div class="num">03</div>
-
-            <h3>
-              Get your stuff.
-            </h3>
-
-            <p>
-              Happy with the final quote? We buy it, receive it in the UK and send it on to you.
-            </p>
-          </article>
-
+        <div class="mini-label">
+          NO EMAIL. NO WAITING.
         </div>
 
       </div>
 
-    </section>
+    </div>
+
+  </div>
+
+</section>
 
 
-    <section class="final-cta">
+<section class="intro" id="how">
 
-      <div class="wrap">
+  <div class="wrap center">
 
-        <div class="eyebrow" style="color:#FF8B4A">
-          Found something?
-        </div>
+    <div class="eyebrow">
+      How it works
+    </div>
 
-        <h2>
-          Don't overthink it.
-        </h2>
+    <h2>
+      Three simple steps.
+    </h2>
+
+    <p class="sub">
+      No account to create. No complicated forwarding service to learn. Just tell us what you want.
+    </p>
+
+
+    <div class="steps">
+
+      <article class="step">
+
+        <div class="num">01</div>
+
+        <h3>
+          Send us the link.
+        </h3>
 
         <p>
-          Send us the link and we'll tell you what getting it to you is likely to cost.
+          You've found something you want. Paste the product link and tell us where it needs to go.
         </p>
 
-        <a
-          class="top-cta"
-          style="display:inline-block;background:var(--orange);border-color:var(--orange);color:white"
-          href="#estimate"
-        >
-          GET MY ESTIMATE →
-        </a>
-
-      </div>
-
-    </section>
-
-  </main>
+      </article>
 
 
-  <footer class="wrap" id="faq">
+      <article class="step">
 
-    <div>
-      © 2026 Get It, Send It.
+        <div class="num">02</div>
+
+        <h3>
+          Get your estimate.
+        </h3>
+
+        <p>
+          We'll show the likely delivered cost, including our fee and estimated international delivery.
+        </p>
+
+      </article>
+
+
+      <article class="step">
+
+        <div class="num">03</div>
+
+        <h3>
+          Get your stuff.
+        </h3>
+
+        <p>
+          Happy with the final quote? We buy it, receive it in the UK and send it on to you.
+        </p>
+
+      </article>
+
     </div>
 
-    <div>
-      FAQs · Terms · Privacy
+  </div>
+
+</section>
+
+
+<section class="final-cta">
+
+  <div class="wrap">
+
+    <div
+      class="eyebrow"
+      style="color:#FF8B4A"
+    >
+      Found something?
     </div>
 
-  </footer>
+    <h2>
+      Don't overthink it.
+    </h2>
+
+    <p>
+      Send us the link and we'll tell you what getting it to you is likely to cost.
+    </p>
+
+    <a
+      class="top-cta"
+      style="display:inline-block;background:var(--orange);border-color:var(--orange);color:white"
+      href="#estimate"
+    >
+      GET MY ESTIMATE →
+    </a>
+
+  </div>
+
+</section>
+
+</main>
 
 
-  <script>
+<footer class="wrap" id="faq">
 
-    const demoUrl =
-      "https://www.toysngeek.co.uk/products/star-wars-vintage-collection-jedi-survivor?currency=GBP&variant=56633019072899";
+  <div>
+    © 2026 Get It, Send It.
+  </div>
 
-    const btn =
-      document.getElementById("estimateBtn");
+  <div>
+    FAQs · Terms · Privacy
+  </div>
 
-    const demo =
-      document.getElementById("demo");
-
-    const url =
-      document.getElementById("url");
-
-    const result =
-      document.getElementById("result");
-
-    const errorMessage =
-      document.getElementById("errorMessage");
+</footer>
 
 
-    const rates = {
+<script>
 
-      US:{
-        ship:24
-      },
-
-      CA:{
-        ship:25
-      },
-
-      AU:{
-        ship:27
-      },
-
-      NZ:{
-        ship:29
-      },
-
-      DE:{
-        ship:17
-      },
-
-      FR:{
-        ship:17
-      },
-
-      ES:{
-        ship:18
-      },
-
-      NL:{
-        ship:17
-      },
-
-      OTHER:{
-        ship:30
-      }
-
-    };
+  const demoUrl =
+    "https://www.toysngeek.co.uk/products/star-wars-vintage-collection-jedi-survivor?currency=GBP&variant=56633019072899";
 
 
-    function money(n){
-      return "£" + n.toFixed(2);
+  const btn =
+    document.getElementById("estimateBtn");
+
+  const manualBtn =
+    document.getElementById("manualEstimateBtn");
+
+  const demo =
+    document.getElementById("demo");
+
+  const url =
+    document.getElementById("url");
+
+  const result =
+    document.getElementById("result");
+
+  const errorMessage =
+    document.getElementById("errorMessage");
+
+  const manualFields =
+    document.getElementById("manualFields");
+
+  const manualProduct =
+    document.getElementById("manualProduct");
+
+  const manualDelivery =
+    document.getElementById("manualDelivery");
+
+
+  const rates = {
+
+    US:{ship:24},
+    CA:{ship:25},
+    AU:{ship:27},
+    NZ:{ship:29},
+    DE:{ship:17},
+    FR:{ship:17},
+    ES:{ship:18},
+    NL:{ship:17},
+    OTHER:{ship:30}
+
+  };
+
+
+  function money(n){
+    return "£" + n.toFixed(2);
+  }
+
+
+  function showEstimate(product, ukDelivery){
+
+    const country =
+      document.getElementById("country").value;
+
+    const fee = 15;
+
+    const ship =
+      rates[country].ship;
+
+
+    /*
+      Import VAT, customs duty and carrier
+      handling charges are deliberately NOT
+      included in this estimate.
+    */
+
+
+    const low =
+      Math.max(
+        0,
+        product +
+        ukDelivery +
+        fee +
+        ship -
+        4
+      );
+
+
+    const high =
+      product +
+      ukDelivery +
+      fee +
+      ship +
+      4;
+
+
+    document.getElementById(
+      "productCost"
+    ).textContent =
+      money(product);
+
+
+    document.getElementById(
+      "ukDelivery"
+    ).textContent =
+      money(ukDelivery);
+
+
+    document.getElementById(
+      "serviceFee"
+    ).textContent =
+      money(fee);
+
+
+    document.getElementById(
+      "intlShipping"
+    ).textContent =
+      "~" + money(ship);
+
+
+    document.getElementById(
+      "range"
+    ).textContent =
+      money(low) +
+      "–" +
+      money(high);
+
+
+    result.classList.add("show");
+
+    result.scrollIntoView({
+      behavior:"smooth",
+      block:"nearest"
+    });
+
+  }
+
+
+  async function runEstimate(){
+
+    const productUrl =
+      url.value.trim();
+
+
+    if(!productUrl){
+
+      url.focus();
+
+      url.placeholder =
+        "Paste a product link first";
+
+      return;
+
     }
 
 
-    async function runEstimate(){
+    errorMessage.classList.remove("show");
 
-      const country =
-        document.getElementById("country").value;
+    manualFields.classList.remove("show");
 
-      const productUrl =
-        url.value.trim();
+    result.classList.remove("show");
 
 
-      if(!productUrl){
-
-        url.focus();
-
-        url.placeholder =
-          "Paste a product link first";
-
-        return;
-      }
+    const originalButtonText =
+      btn.textContent;
 
 
-      errorMessage.classList.remove("show");
+    btn.disabled = true;
 
-      result.classList.remove("show");
+    btn.textContent =
+      "CHECKING PRODUCT…";
 
-      const originalButtonText =
-        btn.textContent;
 
-      btn.disabled = true;
+    try{
 
-      btn.textContent =
-        "CHECKING PRODUCT…";
+      const response =
+        await fetch(
+          "/api/product?url=" +
+          encodeURIComponent(productUrl)
+        );
+
+
+      let data;
 
 
       try{
 
-        const response =
-          await fetch(
-            "/api/product?url=" +
-            encodeURIComponent(productUrl)
-          );
+        data =
+          await response.json();
 
+      }catch{
 
-        let data;
-
-        try{
-          data = await response.json();
-        }catch{
-          throw new Error(
-            "The product lookup returned an invalid response."
-          );
-        }
-
-
-        if(
-          !response.ok ||
-          !data.success ||
-          !data.product ||
-          typeof data.product.price !== "number"
-        ){
-
-          throw new Error(
-            data.error ||
-            "We couldn't automatically find the product price."
-          );
-
-        }
-
-
-        const product =
-          data.product.price;
-
-
-        const currency =
-          data.product.currency;
-
-
-        /*
-          V1 estimate deliberately excludes
-          destination import VAT, customs duty
-          and carrier handling charges.
-
-          Those charges vary by destination,
-          product classification, value and
-          import arrangements. We will build
-          that system separately once properly
-          researched.
-        */
-
-
-        if(currency && currency !== "GBP"){
-
-          throw new Error(
-            "We found the product price, but it is not currently listed in GBP."
-          );
-
-        }
-
-
-        const ukDelivery = 0;
-
-        const fee = 15;
-
-        const ship =
-          rates[country].ship;
-
-
-        const low =
-          Math.max(
-            0,
-            product +
-            ukDelivery +
-            fee +
-            ship -
-            4
-          );
-
-
-        const high =
-          product +
-          ukDelivery +
-          fee +
-          ship +
-          4;
-
-
-        document.getElementById(
-          "productCost"
-        ).textContent =
-          money(product);
-
-
-        document.getElementById(
-          "ukDelivery"
-        ).textContent =
-          money(ukDelivery);
-
-
-        document.getElementById(
-          "serviceFee"
-        ).textContent =
-          money(fee);
-
-
-        document.getElementById(
-          "intlShipping"
-        ).textContent =
-          "~" + money(ship);
-
-
-        document.getElementById(
-          "range"
-        ).textContent =
-          money(low) +
-          "–" +
-          money(high);
-
-
-        result.classList.add("show");
-
-        result.scrollIntoView({
-          behavior:"smooth",
-          block:"nearest"
-        });
-
-
-      }catch(error){
-
-        errorMessage.textContent =
-          error.message ||
-          "We couldn't automatically find the product price. Please check the link and try again.";
-
-        errorMessage.classList.add("show");
-
-
-      }finally{
-
-        btn.disabled = false;
-
-        btn.textContent =
-          originalButtonText;
+        throw new Error(
+          "The product lookup returned an invalid response."
+        );
 
       }
+
+
+      if(
+        !response.ok ||
+        !data.success ||
+        !data.product ||
+        typeof data.product.price !== "number"
+      ){
+
+        throw new Error(
+          data.error ||
+          "We couldn't automatically find the product price."
+        );
+
+      }
+
+
+      const product =
+        data.product.price;
+
+
+      const currency =
+        data.product.currency;
+
+
+      if(
+        currency &&
+        currency !== "GBP"
+      ){
+
+        throw new Error(
+          "We found the product price, but it is not currently listed in GBP."
+        );
+
+      }
+
+
+      /*
+        Even when we successfully find the
+        product price, we still ask for UK
+        delivery because the retailer's
+        checkout price is the reliable figure.
+      */
+
+
+      manualFields.classList.add("show");
+
+      manualProduct.value =
+        product.toFixed(2);
+
+      manualDelivery.focus();
+
+
+      errorMessage.textContent =
+        "We found the product price. Please enter the UK delivery charge shown by the retailer.";
+
+      errorMessage.classList.add("show");
+
+
+    }catch(error){
+
+      /*
+        Automatic lookup failed.
+
+        This is expected for some retailers
+        such as sites returning HTTP 403.
+        We don't fail the whole estimate.
+      */
+
+
+      errorMessage.textContent =
+        "We couldn't automatically retrieve the product price from this retailer. Enter the product price and UK delivery below and we'll calculate the estimate.";
+
+      errorMessage.classList.add("show");
+
+
+      manualFields.classList.add("show");
+
+      manualProduct.value = "";
+
+      manualDelivery.value = "";
+
+      manualProduct.focus();
+
+
+    }finally{
+
+      btn.disabled = false;
+
+      btn.textContent =
+        originalButtonText;
+
+    }
+
+  }
+
+
+  function runManualEstimate(){
+
+    const product =
+      parseFloat(manualProduct.value);
+
+
+    const ukDelivery =
+      parseFloat(manualDelivery.value);
+
+
+    if(
+      Number.isNaN(product) ||
+      product < 0
+    ){
+
+      manualProduct.focus();
+
+      return;
 
     }
 
 
-    demo.addEventListener(
-      "click",
-      () => {
+    if(
+      Number.isNaN(ukDelivery) ||
+      ukDelivery < 0
+    ){
 
-        url.value =
-          demoUrl;
+      manualDelivery.focus();
 
-        runEstimate();
+      return;
 
-      }
+    }
+
+
+    errorMessage.classList.remove("show");
+
+    showEstimate(
+      product,
+      ukDelivery
     );
 
+  }
 
-    btn.addEventListener(
-      "click",
-      runEstimate
-    );
 
-  </script>
+  demo.addEventListener(
+    "click",
+    () => {
+
+      url.value =
+        demoUrl;
+
+      document.getElementById(
+        "country"
+      ).value = "NZ";
+
+      runEstimate();
+
+    }
+  );
+
+
+  btn.addEventListener(
+    "click",
+    runEstimate
+  );
+
+
+  manualBtn.addEventListener(
+    "click",
+    runManualEstimate
+  );
+
+</script>
 
 </body>
 </html>
