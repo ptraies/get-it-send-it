@@ -1117,8 +1117,8 @@
     */
     const allInRow = document.getElementById("allInRow");
 
-    if (importTax && !missingUkShipping && !missingDestinationShipping) {
-      const allLow = baseLow + importTax.low;
+if (importTax) {      
+  const allLow = baseLow + importTax.low;
       const allHigh = baseHigh + importTax.high;
 
       setText(
