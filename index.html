@@ -549,18 +549,8 @@
             Deliver to
           </div>
 
-          <select id="country">
-
-            <option value="US">🇺🇸 United States</option>
-            <option value="CA">🇨🇦 Canada</option>
-            <option value="AU">🇦🇺 Australia</option>
-            <option value="NZ">🇳🇿 New Zealand</option>
-            <option value="DE">🇩🇪 Germany</option>
-            <option value="FR">🇫🇷 France</option>
-            <option value="ES">🇪🇸 Spain</option>
-            <option value="NL">🇳🇱 Netherlands</option>
-            <option value="OTHER">🌍 Other</option>
-
+          <select id="country" aria-label="Destination country">
+            <option value="">Choose a country</option>
           </select>
 
         </div>
@@ -589,11 +579,11 @@
         <div class="manual-fields" id="manualFields">
 
           <div class="field-label">
-            We need two details
+            We need the price
           </div>
 
-          <p class="manual-note">
-            We couldn't automatically retrieve all the product information from this retailer. Enter the figures shown on the retailer's website and we'll finish the estimate for you.
+          <p class="manual-note" id="manualNote">
+            We couldn't automatically retrieve the product price. Enter the product price in GBP. If you know the retailer's delivery charge to the UK, enter it too. If you don't know it, leave it blank. We won't invent a delivery charge we cannot establish.
           </p>
 
 
@@ -608,6 +598,7 @@
               type="number"
               min="0"
               step="0.01"
+              inputmode="decimal"
               placeholder="e.g. 39.99"
             >
 
@@ -617,7 +608,7 @@
           <div class="manual-field">
 
             <div class="field-label">
-              UK delivery to us (£)
+              UK delivery to us (£) <span style="font-weight:500;text-transform:none;letter-spacing:0">(optional)</span>
             </div>
 
             <input
@@ -625,7 +616,8 @@
               type="number"
               min="0"
               step="0.01"
-              placeholder="e.g. 4.99"
+              inputmode="decimal"
+              placeholder="Leave blank if unknown"
             >
 
           </div>
@@ -648,9 +640,12 @@
             Your estimate
           </div>
 
-
           <div class="range" id="range">
             £—
+          </div>
+
+          <div class="tiny" id="rangeLabel" style="text-align:left;margin:0 0 12px">
+            Estimated amount payable to Get It, Send It.
           </div>
 
 
@@ -662,7 +657,7 @@
             </div>
 
             <div>
-              <span>UK delivery</span>
+              <span>UK delivery to us</span>
               <strong id="ukDelivery">£—</strong>
             </div>
 
@@ -673,19 +668,27 @@
 
             <div>
               <span>International delivery</span>
-              <strong id="intlShipping">~£—</strong>
+              <strong id="intlShipping">£—</strong>
             </div>
 
             <div>
-              <span>Import charges</span>
-              <strong>Not included</strong>
+              <span>Potential import charges</span>
+              <strong id="importTax">—</strong>
+            </div>
+
+            <div id="allInRow" style="display:none">
+              <span>Potential overall cost</span>
+              <strong id="allInRange">—</strong>
             </div>
 
           </div>
 
+          <div class="caveat" id="shippingBasis">
+            Shipping figures are estimates unless the retailer or carrier has supplied an exact charge.
+          </div>
 
-          <div class="caveat">
-            This is an instant estimate. Import VAT, customs duty and carrier handling charges are not included and may be payable by the recipient when the parcel arrives.
+          <div class="caveat" id="taxCaveat">
+            Import VAT, customs duty and carrier/clearance charges can depend on the product, value, origin, destination and the way the shipment is declared. Any figure shown here is indicative, not a guaranteed customs charge.
           </div>
 
         </div>
@@ -856,364 +859,515 @@
 
 <script>
 
+  /*
+    Front-end rules:
+    - The Worker is the source of truth for shipping/tax estimates.
+    - This page never invents a tax or shipping rate.
+    - Exact retailer/carrier charges are preferred where supplied.
+    - Indicative figures are labelled as such.
+  */
+
   const demoUrl =
     "https://www.toysngeek.co.uk/products/star-wars-vintage-collection-jedi-survivor?currency=GBP&variant=56633019072899";
 
+  const btn = document.getElementById("estimateBtn");
+  const manualBtn = document.getElementById("manualEstimateBtn");
+  const demo = document.getElementById("demo");
+  const url = document.getElementById("url");
+  const country = document.getElementById("country");
+  const result = document.getElementById("result");
+  const errorMessage = document.getElementById("errorMessage");
+  const manualFields = document.getElementById("manualFields");
+  const manualNote = document.getElementById("manualNote");
+  const manualProduct = document.getElementById("manualProduct");
+  const manualDelivery = document.getElementById("manualDelivery");
 
-  const btn =
-    document.getElementById("estimateBtn");
+  /*
+    ISO 3166-1 alpha-2 destination list.
+    The Worker remains responsible for whether it has a
+    shipping/tax rule for a particular destination.
+  */
+  const COUNTRIES = [
+    ["AF","Afghanistan"],["AL","Albania"],["DZ","Algeria"],["AD","Andorra"],["AO","Angola"],
+    ["AG","Antigua and Barbuda"],["AR","Argentina"],["AM","Armenia"],["AU","Australia"],
+    ["AT","Austria"],["AZ","Azerbaijan"],["BS","Bahamas"],["BH","Bahrain"],["BD","Bangladesh"],
+    ["BB","Barbados"],["BY","Belarus"],["BE","Belgium"],["BZ","Belize"],["BJ","Benin"],
+    ["BT","Bhutan"],["BO","Bolivia"],["BA","Bosnia and Herzegovina"],["BW","Botswana"],
+    ["BR","Brazil"],["BN","Brunei"],["BG","Bulgaria"],["BF","Burkina Faso"],["BI","Burundi"],
+    ["CV","Cabo Verde"],["KH","Cambodia"],["CM","Cameroon"],["CA","Canada"],
+    ["CF","Central African Republic"],["TD","Chad"],["CL","Chile"],["CN","China"],
+    ["CO","Colombia"],["KM","Comoros"],["CG","Congo"],["CD","Congo, Democratic Republic"],
+    ["CR","Costa Rica"],["CI","Côte d'Ivoire"],["HR","Croatia"],["CU","Cuba"],["CY","Cyprus"],
+    ["CZ","Czechia"],["DK","Denmark"],["DJ","Djibouti"],["DM","Dominica"],
+    ["DO","Dominican Republic"],["EC","Ecuador"],["EG","Egypt"],["SV","El Salvador"],
+    ["GQ","Equatorial Guinea"],["ER","Eritrea"],["EE","Estonia"],["SZ","Eswatini"],
+    ["ET","Ethiopia"],["FJ","Fiji"],["FI","Finland"],["FR","France"],["GA","Gabon"],
+    ["GM","Gambia"],["GE","Georgia"],["DE","Germany"],["GH","Ghana"],["GR","Greece"],
+    ["GD","Grenada"],["GT","Guatemala"],["GN","Guinea"],["GW","Guinea-Bissau"],
+    ["GY","Guyana"],["HT","Haiti"],["HN","Honduras"],["HU","Hungary"],["IS","Iceland"],
+    ["IN","India"],["ID","Indonesia"],["IR","Iran"],["IQ","Iraq"],["IE","Ireland"],
+    ["IL","Israel"],["IT","Italy"],["JM","Jamaica"],["JP","Japan"],["JO","Jordan"],
+    ["KZ","Kazakhstan"],["KE","Kenya"],["KI","Kiribati"],["KP","North Korea"],
+    ["KR","South Korea"],["KW","Kuwait"],["KG","Kyrgyzstan"],["LA","Laos"],["LV","Latvia"],
+    ["LB","Lebanon"],["LS","Lesotho"],["LR","Liberia"],["LY","Libya"],["LI","Liechtenstein"],
+    ["LT","Lithuania"],["LU","Luxembourg"],["MG","Madagascar"],["MW","Malawi"],
+    ["MY","Malaysia"],["MV","Maldives"],["ML","Mali"],["MT","Malta"],["MH","Marshall Islands"],
+    ["MR","Mauritania"],["MU","Mauritius"],["MX","Mexico"],["FM","Micronesia"],
+    ["MD","Moldova"],["MC","Monaco"],["MN","Mongolia"],["ME","Montenegro"],["MA","Morocco"],
+    ["MZ","Mozambique"],["MM","Myanmar"],["NA","Namibia"],["NR","Nauru"],["NP","Nepal"],
+    ["NL","Netherlands"],["NZ","New Zealand"],["NI","Nicaragua"],["NE","Niger"],
+    ["NG","Nigeria"],["MK","North Macedonia"],["NO","Norway"],["OM","Oman"],["PK","Pakistan"],
+    ["PW","Palau"],["PS","Palestine"],["PA","Panama"],["PG","Papua New Guinea"],
+    ["PY","Paraguay"],["PE","Peru"],["PH","Philippines"],["PL","Poland"],["PT","Portugal"],
+    ["QA","Qatar"],["RO","Romania"],["RU","Russia"],["RW","Rwanda"],["KN","Saint Kitts and Nevis"],
+    ["LC","Saint Lucia"],["VC","Saint Vincent and the Grenadines"],["WS","Samoa"],
+    ["SM","San Marino"],["ST","Sao Tome and Principe"],["SA","Saudi Arabia"],
+    ["SN","Senegal"],["RS","Serbia"],["SC","Seychelles"],["SL","Sierra Leone"],
+    ["SG","Singapore"],["SK","Slovakia"],["SI","Slovenia"],["SB","Solomon Islands"],
+    ["SO","Somalia"],["ZA","South Africa"],["SS","South Sudan"],["ES","Spain"],
+    ["LK","Sri Lanka"],["SD","Sudan"],["SR","Suriname"],["SE","Sweden"],["CH","Switzerland"],
+    ["SY","Syria"],["TW","Taiwan"],["TJ","Tajikistan"],["TZ","Tanzania"],["TH","Thailand"],
+    ["TL","Timor-Leste"],["TG","Togo"],["TO","Tonga"],["TT","Trinidad and Tobago"],
+    ["TN","Tunisia"],["TR","Türkiye"],["TM","Turkmenistan"],["TV","Tuvalu"],["UG","Uganda"],
+    ["UA","Ukraine"],["AE","United Arab Emirates"],["GB","United Kingdom"],["US","United States"],
+    ["UY","Uruguay"],["UZ","Uzbekistan"],["VU","Vanuatu"],["VA","Vatican City"],
+    ["VE","Venezuela"],["VN","Vietnam"],["YE","Yemen"],["ZM","Zambia"],["ZW","Zimbabwe"]
+  ];
 
-  const manualBtn =
-    document.getElementById("manualEstimateBtn");
-
-  const demo =
-    document.getElementById("demo");
-
-  const url =
-    document.getElementById("url");
-
-  const result =
-    document.getElementById("result");
-
-  const errorMessage =
-    document.getElementById("errorMessage");
-
-  const manualFields =
-    document.getElementById("manualFields");
-
-  const manualProduct =
-    document.getElementById("manualProduct");
-
-  const manualDelivery =
-    document.getElementById("manualDelivery");
-
-
-  const rates = {
-
-    US:{ship:24},
-    CA:{ship:25},
-    AU:{ship:27},
-    NZ:{ship:29},
-    DE:{ship:17},
-    FR:{ship:17},
-    ES:{ship:18},
-    NL:{ship:17},
-    OTHER:{ship:30}
-
-  };
-
-
-  function money(n){
-    return "£" + n.toFixed(2);
+  for (const [code, name] of COUNTRIES) {
+    const option = document.createElement("option");
+    option.value = code;
+    option.textContent = name;
+    country.appendChild(option);
   }
 
-
-  function showEstimate(product, ukDelivery){
-
-    const country =
-      document.getElementById("country").value;
-
-    const fee = 15;
-
-    const ship =
-      rates[country].ship;
-
-
-    /*
-      Import VAT, customs duty and carrier
-      handling charges are deliberately NOT
-      included in this estimate.
-    */
-
-
-    const low =
-      Math.max(
-        0,
-        product +
-        ukDelivery +
-        fee +
-        ship -
-        4
-      );
-
-
-    const high =
-      product +
-      ukDelivery +
-      fee +
-      ship +
-      4;
-
-
-    document.getElementById(
-      "productCost"
-    ).textContent =
-      money(product);
-
-
-    document.getElementById(
-      "ukDelivery"
-    ).textContent =
-      money(ukDelivery);
-
-
-    document.getElementById(
-      "serviceFee"
-    ).textContent =
-      money(fee);
-
-
-    document.getElementById(
-      "intlShipping"
-    ).textContent =
-      "~" + money(ship);
-
-
-    document.getElementById(
-      "range"
-    ).textContent =
-      money(low) +
-      "–" +
-      money(high);
-
-
-    result.classList.add("show");
-
-    result.scrollIntoView({
-      behavior:"smooth",
-      block:"nearest"
-    });
-
+  function money(value) {
+    const n = Number(value);
+    return Number.isFinite(n)
+      ? "£" + n.toFixed(2)
+      : "—";
   }
 
+  function numberOrNull(value) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
 
-  async function runEstimate(){
+  /*
+    Accept the Worker shipping/tax object without assuming
+    a particular future shape. If the Worker supplies:
+      {low, high, status, label, basis}
+    we use it. If it supplies a number, we treat that as
+    an exact/known figure rather than inventing a range.
+  */
+  function normaliseRange(value) {
+    if (value == null) return null;
 
-    const productUrl =
-      url.value.trim();
-
-
-    if(!productUrl){
-
-      url.focus();
-
-      url.placeholder =
-        "Paste a product link first";
-
-      return;
-
+    if (typeof value === "number") {
+      return { low: value, high: value, status: "confirmed" };
     }
 
+    if (typeof value !== "object") return null;
+
+    const low = numberOrNull(value.low);
+    const high = numberOrNull(value.high);
+
+    if (low !== null && high !== null) {
+      return {
+        low: Math.min(low, high),
+        high: Math.max(low, high),
+        status: value.status || "indicative",
+        label: value.label || "",
+        basis: value.basis || ""
+      };
+    }
+
+    const amount = numberOrNull(value.amount);
+
+    if (amount !== null) {
+      return {
+        low: amount,
+        high: amount,
+        status: value.status || "confirmed",
+        label: value.label || "",
+        basis: value.basis || ""
+      };
+    }
+
+    return null;
+  }
+
+  function rangeText(range, prefix = "") {
+    if (!range) return "Not available";
+
+    const suffix =
+      range.status === "confirmed"
+        ? ""
+        : "~";
+
+    if (Math.abs(range.high - range.low) < 0.005) {
+      return prefix + suffix + money(range.low);
+    }
+
+    return prefix + suffix + money(range.low) + "–" + money(range.high);
+  }
+
+  function setText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  }
+
+  function setResultVisibility(show) {
+    result.classList.toggle("show", show);
+  }
+
+  function showEstimate(data, product, manualUkDelivery = null) {
+    const fee =
+      numberOrNull(data?.serviceFee?.amount) ??
+      numberOrNull(data?.serviceFee) ??
+      15;
+
+    const ukShipping =
+      normaliseRange(
+        manualUkDelivery !== null
+          ? { amount: manualUkDelivery, status: "confirmed" }
+          : data?.ukShipping
+      );
+
+    const destinationShipping =
+      normaliseRange(data?.destinationShipping);
+
+    const importTax =
+      normaliseRange(data?.importTax);
+
+    /*
+      We calculate the amount payable to Get It, Send It
+      only from the components actually available.
+      No tax or shipping rate is invented here.
+    */
+    const ukLow = ukShipping ? ukShipping.low : null;
+    const ukHigh = ukShipping ? ukShipping.high : null;
+
+    const shipLow =
+      destinationShipping ? destinationShipping.low : null;
+
+    const shipHigh =
+      destinationShipping ? destinationShipping.high : null;
+
+    const baseLow =
+      product +
+      (ukLow ?? 0) +
+      fee +
+      (shipLow ?? 0);
+
+    const baseHigh =
+      product +
+      (ukHigh ?? 0) +
+      fee +
+      (shipHigh ?? 0);
+
+    const missingUkShipping = !ukShipping;
+    const missingDestinationShipping = !destinationShipping;
+
+    setText("productCost", money(product));
+
+    setText(
+      "ukDelivery",
+      ukShipping
+        ? rangeText(ukShipping)
+        : "Estimate unavailable"
+    );
+
+    setText("serviceFee", money(fee));
+
+    setText(
+      "intlShipping",
+      destinationShipping
+        ? rangeText(destinationShipping)
+        : "Estimate unavailable"
+    );
+
+    setText(
+      "importTax",
+      importTax
+        ? rangeText(importTax)
+        : "Not calculated"
+    );
+
+    setText(
+      "range",
+      missingUkShipping || missingDestinationShipping
+        ? "Estimate incomplete"
+        : money(baseLow) + "–" + money(baseHigh)
+    );
+
+    setText(
+      "rangeLabel",
+      missingUkShipping || missingDestinationShipping
+        ? "We don't have enough reliable shipping information to give you a complete total yet."
+        : "Estimated amount payable to Get It, Send It — before any recipient-paid import charges."
+    );
+
+    /*
+      Import tax is deliberately shown separately because
+      it may be collected by customs/carrier from the recipient.
+      If the Worker supplies an indicative figure, show a
+      separate possible all-in range rather than pretending
+      it is part of our invoice.
+    */
+    const allInRow = document.getElementById("allInRow");
+
+    if (importTax && !missingUkShipping && !missingDestinationShipping) {
+      const allLow = baseLow + importTax.low;
+      const allHigh = baseHigh + importTax.high;
+
+      setText(
+        "allInRange",
+        money(allLow) + "–" + money(allHigh)
+      );
+
+      allInRow.style.display = "flex";
+    } else {
+      allInRow.style.display = "none";
+    }
+
+    const basisBits = [];
+
+    if (ukShipping?.status !== "confirmed") {
+      basisBits.push("UK delivery is indicative");
+    }
+
+    if (destinationShipping?.status !== "confirmed") {
+      basisBits.push("international delivery is indicative");
+    }
+
+    if (data?.fx?.status && data.fx.status !== "confirmed") {
+      basisBits.push("currency conversion is indicative");
+    }
+
+    const basisText =
+      basisBits.length
+        ? basisBits.join("; ") + "."
+        : "Shipping figures are based on confirmed charges supplied to the calculation engine.";
+
+    setText("shippingBasis", basisText);
+
+    const taxText =
+      importTax
+        ? (
+            (importTax.label || "Potential import charges are shown separately.") +
+            " They are indicative unless the actual customs/carrier charge is known."
+          )
+        : "Import VAT, customs duty and carrier/clearance charges could not be calculated reliably for this estimate and are not included.";
+
+    setText("taxCaveat", taxText);
+
+    setResultVisibility(true);
+
+    result.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest"
+    });
+  }
+
+  function showManual(productValue = "") {
+    manualFields.classList.add("show");
+
+    manualProduct.value =
+      productValue !== ""
+        ? Number(productValue).toFixed(2)
+        : "";
+
+    manualDelivery.value = "";
+
+    manualProduct.focus();
+  }
+
+  async function runEstimate() {
+    const productUrl = url.value.trim();
+    const destination = country.value;
+
+    if (!productUrl) {
+      url.focus();
+      url.placeholder = "Paste a product link first";
+      return;
+    }
+
+    if (!destination) {
+      country.focus();
+      return;
+    }
 
     errorMessage.classList.remove("show");
-
     manualFields.classList.remove("show");
+    setResultVisibility(false);
 
-    result.classList.remove("show");
-
-
-    const originalButtonText =
-      btn.textContent;
-
-
+    const originalButtonText = btn.textContent;
     btn.disabled = true;
+    btn.textContent = "CHECKING PRODUCT…";
 
-    btn.textContent =
-      "CHECKING PRODUCT…";
-
-
-    try{
-
-      const response =
-        await fetch(
-          "/api/product?url=" +
-          encodeURIComponent(productUrl)
-        );
-
+    try {
+      const response = await fetch(
+        "/api/product?url=" +
+        encodeURIComponent(productUrl) +
+        "&destination=" +
+        encodeURIComponent(destination)
+      );
 
       let data;
 
-
-      try{
-
-        data =
-          await response.json();
-
-      }catch{
-
+      try {
+        data = await response.json();
+      } catch {
         throw new Error(
           "The product lookup returned an invalid response."
         );
-
       }
 
-
-      if(
+      if (
         !response.ok ||
         !data.success ||
         !data.product ||
-        typeof data.product.price !== "number"
-      ){
-
-        throw new Error(
-          data.error ||
-          "We couldn't automatically find the product price."
-        );
-
+        typeof data.product.priceGbp !== "number"
+      ) {
+        /*
+          Support the previous Worker response shape too.
+          This avoids breaking the page while the Worker evolves.
+        */
+        if (
+          response.ok &&
+          data.success &&
+          data.product &&
+          typeof data.product.price === "number" &&
+          (!data.product.currency || data.product.currency === "GBP")
+        ) {
+          data.product.priceGbp = data.product.price;
+        } else {
+          throw new Error(
+            data.error ||
+            "We couldn't automatically find the product price."
+          );
+        }
       }
 
+      const product = data.product.priceGbp;
 
-      const product =
-        data.product.price;
+      manualFields.classList.remove("show");
 
+      showEstimate(data, product);
 
-      const currency =
-        data.product.currency;
-
-
-      if(
-        currency &&
-        currency !== "GBP"
-      ){
-
-        throw new Error(
-          "We found the product price, but it is not currently listed in GBP."
-        );
-
-      }
-
-
+    } catch (error) {
       /*
-        Even when we successfully find the
-        product price, we still ask for UK
-        delivery because the retailer's
-        checkout price is the reliable figure.
+        We don't pretend a failed retailer lookup is a failed
+        estimate. The user can enter the price manually.
       */
-
-
-      manualFields.classList.add("show");
-
-      manualProduct.value =
-        product.toFixed(2);
-
-      manualDelivery.focus();
-
-
       errorMessage.textContent =
-        "We found the product price. Please enter the UK delivery charge shown by the retailer.";
+        "We couldn't automatically retrieve the product price from this retailer. Enter the product price in GBP below. UK delivery is optional — leave it blank if you don't know it.";
 
       errorMessage.classList.add("show");
 
-
-    }catch(error){
-
-      /*
-        Automatic lookup failed.
-
-        This is expected for some retailers
-        such as sites returning HTTP 403.
-        We don't fail the whole estimate.
-      */
-
-
-      errorMessage.textContent =
-        "We couldn't automatically retrieve the product price from this retailer. Enter the product price and UK delivery below and we'll calculate the estimate.";
-
-      errorMessage.classList.add("show");
-
-
-      manualFields.classList.add("show");
-
-      manualProduct.value = "";
-
-      manualDelivery.value = "";
-
-      manualProduct.focus();
-
-
-    }finally{
-
+      showManual();
+    } finally {
       btn.disabled = false;
-
-      btn.textContent =
-        originalButtonText;
-
+      btn.textContent = originalButtonText;
     }
-
   }
 
+  async function runManualEstimate() {
+    const product = parseFloat(manualProduct.value);
+    const deliveryText = manualDelivery.value.trim();
+    const destination = country.value;
 
-  function runManualEstimate(){
+    if (Number.isNaN(product) || product < 0) {
+      manualProduct.focus();
+      return;
+    }
 
-    const product =
-      parseFloat(manualProduct.value);
-
+    if (!destination) {
+      country.focus();
+      return;
+    }
 
     const ukDelivery =
-      parseFloat(manualDelivery.value);
+      deliveryText === ""
+        ? null
+        : parseFloat(deliveryText);
 
-
-    if(
-      Number.isNaN(product) ||
-      product < 0
-    ){
-
-      manualProduct.focus();
-
-      return;
-
-    }
-
-
-    if(
-      Number.isNaN(ukDelivery) ||
-      ukDelivery < 0
-    ){
-
+    if (
+      ukDelivery !== null &&
+      (Number.isNaN(ukDelivery) || ukDelivery < 0)
+    ) {
       manualDelivery.focus();
-
       return;
-
     }
-
 
     errorMessage.classList.remove("show");
 
-    showEstimate(
-      product,
-      ukDelivery
-    );
+    const originalButtonText = manualBtn.textContent;
+    manualBtn.disabled = true;
+    manualBtn.textContent = "CALCULATING…";
 
+    try {
+      const params = new URLSearchParams({
+        price: product.toString(),
+        currency: "GBP",
+        destination
+      });
+
+      if (ukDelivery !== null) {
+        params.set(
+          "ukShipping",
+          ukDelivery.toString()
+        );
+      }
+
+      const response = await fetch(
+        "/api/estimate?" + params.toString()
+      );
+
+      let data;
+
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error(
+          "The estimate service returned an invalid response."
+        );
+      }
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.error ||
+          "We couldn't calculate the estimate."
+        );
+      }
+
+      manualFields.classList.remove("show");
+
+      showEstimate(
+        data,
+        data.product.priceGbp
+      );
+    } catch (error) {
+      errorMessage.textContent =
+        error.message ||
+        "We couldn't calculate the estimate. Please try again.";
+
+      errorMessage.classList.add("show");
+    } finally {
+      manualBtn.disabled = false;
+      manualBtn.textContent = originalButtonText;
+    }
   }
 
+  demo.addEventListener("click", () => {
+    url.value = demoUrl;
+    country.value = "NZ";
+    runEstimate();
+  });
 
-  demo.addEventListener(
-    "click",
-    () => {
-
-      url.value =
-        demoUrl;
-
-      document.getElementById(
-        "country"
-      ).value = "NZ";
-
-      runEstimate();
-
-    }
-  );
-
-
-  btn.addEventListener(
-    "click",
-    runEstimate
-  );
-
-
-  manualBtn.addEventListener(
-    "click",
-    runManualEstimate
-  );
+  btn.addEventListener("click", runEstimate);
+  manualBtn.addEventListener("click", runManualEstimate);
 
 </script>
 
