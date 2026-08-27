@@ -33,6 +33,36 @@ function getHMArticleCode(value) {
   }
 }
 
+function extractHMPrice(item) {
+  const directCandidates = [
+    item?.price,
+    item?.sellingPrice,
+    item?.currentPrice,
+    item?.redPrice,
+    item?.whitePrice
+  ];
+
+  const direct = directCandidates
+    .map(cleanPrice)
+    .find((value) => value !== null && value > 0);
+
+  if (direct !== undefined) return direct;
+
+  const prices = Array.isArray(item?.prices) ? item.prices : [];
+  const structured = prices
+    .map((entry) => ({
+      type: String(entry?.priceType || entry?.price_type || "").toLowerCase(),
+      value: cleanPrice(entry?.price)
+    }))
+    .filter((entry) => entry.value !== null && entry.value > 0);
+
+  const preferred = structured.find((entry) => entry.type === "redprice") ||
+    structured.find((entry) => entry.type === "whiteprice") ||
+    structured[0];
+
+  return preferred?.value ?? null;
+}
+
 async function findHMProduct(productUrl) {
   const articleCode = getHMArticleCode(productUrl);
   if (!articleCode) return null;
@@ -51,31 +81,50 @@ async function findHMProduct(productUrl) {
     });
 
     if (!response.ok) return null;
+
     const data = await response.json();
-    const hits = Array.isArray(data?.hits) ? data.hits : [];
-    const hit = hits.find((item) => {
-      const code = String(item?.articleCode ?? item?.article_code ?? item?.productId ?? "");
-      const pdp = String(item?.pdpUrl ?? item?.url ?? item?.link ?? "");
-      return code === articleCode || pdp.includes(`productpage.${articleCode}.html`);
+
+    // H&M's search endpoint returns products[], not hits[].
+    const products = Array.isArray(data?.products) ? data.products : [];
+
+    const product = products.find((item) => {
+      const code = String(
+        item?.articleCode ??
+        item?.article_code ??
+        item?.productId ??
+        item?.id ??
+        ""
+      );
+      const pdp = String(
+        item?.pdpUrl ??
+        item?.productUrl ??
+        item?.url ??
+        item?.link ??
+        ""
+      );
+
+      return (
+        code === articleCode ||
+        pdp.includes(`productpage.${articleCode}.html`)
+      );
     });
 
-    if (!hit) return null;
+    if (!product) return null;
 
-    const candidates = [
-      hit.sellingPrice,
-      hit.price,
-      hit.currentPrice,
-      hit.redPrice,
-      hit.whitePrice
-    ];
-    const price = candidates.map(cleanPrice).find((value) => value !== null && value > 0);
-    if (price === undefined) return null;
+    const price = extractHMPrice(product);
+    if (price === null) return null;
 
     return {
-      name: hit.name || hit.productName || null,
+      name: product.productName || product.name || product.title || null,
       price,
       currency: "GBP",
-      availability: hit.outOfStock === true ? "OutOfStock" : "InStock",
+      availability:
+        product?.availability?.stockState === "Unavailable" ||
+        product?.availability?.stockState === "OutOfStock" ||
+        product?.is_out_of_stock === true ||
+        product?.outOfStock === true
+          ? "OutOfStock"
+          : "InStock",
       articleCode
     };
   } catch {
@@ -88,11 +137,18 @@ async function estimateForProduct(request, env, product) {
   const estimateUrl = new URL("https://internal.local/api/estimate");
   estimateUrl.searchParams.set("price", String(product.price));
   estimateUrl.searchParams.set("currency", product.currency);
-  estimateUrl.searchParams.set("destination", incoming.searchParams.get("destination") || "");
+  estimateUrl.searchParams.set(
+    "destination",
+    incoming.searchParams.get("destination") || ""
+  );
 
   try {
-    const response = await baseWorker.fetch(new Request(estimateUrl.toString(), { method: "GET" }), env);
+    const response = await baseWorker.fetch(
+      new Request(estimateUrl.toString(), { method: "GET" }),
+      env
+    );
     const data = await response.json();
+
     if (!data || data.success === false) return null;
 
     return {
