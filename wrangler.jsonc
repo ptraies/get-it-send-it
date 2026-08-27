@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "get-it-send-it",
-  "main": "worker-v2.js",
+  "main": "worker-v3.js",
   "compatibility_date": "2026-08-25",
   "assets": {
     "directory": ".",
