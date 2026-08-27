@@ -63,6 +63,72 @@ function extractHMPrice(item) {
   return preferred?.value ?? null;
 }
 
+function collectHMPriceCandidates(value, candidates = []) {
+  if (!value || typeof value !== "object") return candidates;
+
+  if (Array.isArray(value)) {
+    for (const item of value) collectHMPriceCandidates(item, candidates);
+    return candidates;
+  }
+
+  for (const [key, child] of Object.entries(value)) {
+    const keyName = String(key).toLowerCase();
+    if (
+      /^(price|regularprice|sellingprice|currentprice|redprice|whiteprice|saleprice|minprice|maxprice|formattedprice)$/.test(keyName)
+    ) {
+      const price = cleanPrice(child);
+      if (price !== null && price > 0 && price < 100000) candidates.push(price);
+    }
+    if (child && typeof child === "object") {
+      collectHMPriceCandidates(child, candidates);
+    }
+  }
+
+  return candidates;
+}
+
+function extractHMNextDataProduct(html, articleCode) {
+  const match = html.match(/<script[^>]+id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
+  if (!match) return null;
+
+  try {
+    const data = JSON.parse(match[1].trim());
+    const pageProps = data?.props?.pageProps;
+    const productPageProps = pageProps?.productPageProps;
+    const aemData = productPageProps?.aemData;
+    const info = aemData?.productArticleDetails;
+    if (!info || typeof info !== "object") return null;
+
+    const variations = info?.variations && typeof info.variations === "object"
+      ? info.variations
+      : {};
+    const variation =
+      variations[articleCode] ||
+      Object.values(variations).find((item) => item && typeof item === "object") ||
+      null;
+
+    const localCandidates = [
+      ...collectHMPriceCandidates(variation, []),
+      ...collectHMPriceCandidates(info, [])
+    ];
+    const price = localCandidates.find((value) => value > 0) ??
+      collectHMPriceCandidates(productPageProps, []).find((value) => value > 0) ??
+      null;
+
+    if (price === null) return null;
+
+    return {
+      name: info.productName || productPageProps?.productName || null,
+      price,
+      currency: "GBP",
+      availability: null,
+      articleCode
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function findHMProduct(productUrl) {
   const articleCode = getHMArticleCode(productUrl);
   if (!articleCode) return null;
@@ -74,62 +140,88 @@ async function findHMProduct(productUrl) {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
         "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-GB,en;q=0.9",
         "Referer": productUrl
       },
       redirect: "follow",
       cache: "no-store"
     });
 
-    if (!response.ok) return null;
+    if (response.ok) {
+      const data = await response.json();
+      const products = Array.isArray(data?.products) ? data.products : [];
 
-    const data = await response.json();
+      const product = products.find((item) => {
+        const code = String(
+          item?.articleCode ??
+          item?.article_code ??
+          item?.productId ??
+          item?.id ??
+          ""
+        );
+        const pdp = String(
+          item?.pdpUrl ??
+          item?.productUrl ??
+          item?.product_url ??
+          item?.url ??
+          item?.link ??
+          ""
+        );
 
-    // H&M's search endpoint returns products[], not hits[].
-    const products = Array.isArray(data?.products) ? data.products : [];
+        return (
+          code === articleCode ||
+          pdp.includes(`productpage.${articleCode}.html`)
+        );
+      });
 
-    const product = products.find((item) => {
-      const code = String(
-        item?.articleCode ??
-        item?.article_code ??
-        item?.productId ??
-        item?.id ??
-        ""
-      );
-      const pdp = String(
-        item?.pdpUrl ??
-        item?.productUrl ??
-        item?.url ??
-        item?.link ??
-        ""
-      );
+      if (product) {
+        const price = extractHMPrice(product);
+        if (price !== null) {
+          return {
+            name: product.productName || product.name || product.title || null,
+            price,
+            currency: "GBP",
+            availability:
+              product?.availability?.stockState === "Unavailable" ||
+              product?.availability?.stockState === "OutOfStock" ||
+              product?.is_out_of_stock === true ||
+              product?.outOfStock === true
+                ? "OutOfStock"
+                : "InStock",
+            articleCode
+          };
+        }
+      }
+    }
+  } catch {}
 
-      return (
-        code === articleCode ||
-        pdp.includes(`productpage.${articleCode}.html`)
-      );
+  // H&M also embeds the product page state in __NEXT_DATA__. The search
+  // endpoint is useful when available, but the product page is a better
+  // fallback for direct article-code URLs and survives changes to the
+  // search response shape.
+  try {
+    const pageResponse = await fetch(productUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-GB,en;q=0.9",
+        "Referer": "https://www2.hm.com/en_gb/"
+      },
+      redirect: "follow",
+      cache: "no-store"
     });
 
-    if (!product) return null;
+    if (pageResponse.ok) {
+      const contentType = pageResponse.headers.get("content-type") || "";
+      if (contentType.includes("html")) {
+        const html = await pageResponse.text();
+        const product = extractHMNextDataProduct(html, articleCode);
+        if (product) return product;
+      }
+    }
+  } catch {}
 
-    const price = extractHMPrice(product);
-    if (price === null) return null;
-
-    return {
-      name: product.productName || product.name || product.title || null,
-      price,
-      currency: "GBP",
-      availability:
-        product?.availability?.stockState === "Unavailable" ||
-        product?.availability?.stockState === "OutOfStock" ||
-        product?.is_out_of_stock === true ||
-        product?.outOfStock === true
-          ? "OutOfStock"
-          : "InStock",
-      articleCode
-    };
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 async function estimateForProduct(request, env, product) {
