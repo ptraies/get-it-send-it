@@ -1,6 +1,6 @@
 const ALLOWED_PROTOCOLS = new Set(["http:", "https:"]);
 
-const RULES_VERSION = "2026-08-26.3";
+const RULES_VERSION = "2026-08-27.2";
 const SERVICE_FEE_GBP = 15;
 
 function jsonResponse(data, status = 200) {
@@ -201,6 +201,138 @@ function decodeHtml(value) {
     .replace(/&nbsp;/gi, " ");
 }
 
+function getShopifyProductUrl(productUrl) {
+  const url = new URL(productUrl);
+  const match = url.pathname.match(/\/products\/([^/?#]+)/i);
+
+  if (!match) return null;
+
+  const handle = decodeURIComponent(match[1]);
+
+  return `${url.origin}/products/${encodeURIComponent(handle)}.js`;
+}
+
+async function fetchShopifyProduct(productUrl) {
+  let endpoint;
+
+  try {
+    endpoint = getShopifyProductUrl(productUrl);
+  } catch {
+    return null;
+  }
+
+  if (!endpoint) return null;
+
+  try {
+    const response = await fetch(endpoint, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (compatible; GetItSendIt/1.1; +https://getitsendit.co.uk)",
+        Accept: "application/json,text/plain,*/*"
+      },
+      redirect: "follow"
+    });
+
+    if (!response.ok) return null;
+
+    const contentType =
+      response.headers.get("content-type") || "";
+
+    if (!contentType.includes("json")) return null;
+
+    const data = await response.json();
+    const variants = Array.isArray(data.variants)
+      ? data.variants
+      : [];
+
+    const available = variants.find(
+      (variant) =>
+        variant &&
+        variant.available &&
+        cleanPrice(variant.price) !== null
+    );
+
+    const variant =
+      available ||
+      variants.find(
+        (item) => cleanPrice(item?.price) !== null
+      );
+
+    let price = cleanPrice(data.price);
+
+    if (price !== null && price > 10000) {
+      price /= 100;
+    }
+
+    if (price === null && variant) {
+      price = cleanPrice(variant.price);
+
+      if (price !== null && price > 10000) {
+        price /= 100;
+      }
+    }
+
+    if (price === null && cleanPrice(data.price_min) !== null) {
+      price = cleanPrice(data.price_min);
+
+      if (price > 10000) {
+        price /= 100;
+      }
+    }
+
+    if (price === null) return null;
+
+    return {
+      name: data.title || null,
+      price,
+      currency: normaliseCurrency(data.currency) || "GBP",
+      availability:
+        data.available === false
+          ? "OutOfStock"
+          : data.available === true
+            ? "InStock"
+            : null
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchRetailer(url) {
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (compatible; GetItSendIt/1.0; +https://getitsendit.co.uk)",
+      Accept:
+        "text/html,application/xhtml+xml"
+    },
+    redirect: "follow"
+  });
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      status: response.status
+    };
+  }
+
+  const contentType =
+    response.headers.get("content-type") || "";
+
+  if (!contentType.includes("text/html")) {
+    return {
+      ok: false,
+      status: 422
+    };
+  }
+
+  return {
+    ok: true,
+    html: await response.text(),
+    finalUrl: response.url
+  };
+}
+
 function extractShippingLinks(html, baseUrl) {
   const links = [];
 
@@ -346,41 +478,6 @@ function parseShippingPolicy(text, productPrice) {
   return null;
 }
 
-async function fetchRetailer(url) {
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (compatible; GetItSendIt/1.0; +https://getitsendit.co.uk)",
-      Accept:
-        "text/html,application/xhtml+xml"
-    },
-    redirect: "follow"
-  });
-
-  if (!response.ok) {
-    return {
-      ok: false,
-      status: response.status
-    };
-  }
-
-  const contentType =
-    response.headers.get("content-type") || "";
-
-  if (!contentType.includes("text/html")) {
-    return {
-      ok: false,
-      status: 422
-    };
-  }
-
-  return {
-    ok: true,
-    html: await response.text(),
-    finalUrl: response.url
-  };
-}
-
 async function findUkShipping(
   html,
   finalUrl,
@@ -433,6 +530,7 @@ async function findUkShipping(
       "We could not establish a reliable UK delivery charge from the retailer information we could access."
   };
 }
+
 const SHIPPING_BY_COUNTRY = {
   US: { low: 20, high: 35 },
   CA: { low: 22, high: 38 },
@@ -491,7 +589,6 @@ const SHIPPING_BY_REGION = {
 };
 
 const COUNTRY_REGION = {
-  // Europe
   AL: "europe", AD: "europe", AT: "europe", BY: "europe",
   BE: "europe", BA: "europe", BG: "europe", HR: "europe",
   CY: "europe", CZ: "europe", DK: "europe", EE: "europe",
@@ -504,39 +601,32 @@ const COUNTRY_REGION = {
   RS: "europe", SK: "europe", SI: "europe", ES: "europe",
   SE: "europe", CH: "europe", UA: "europe", VA: "europe",
 
-  // North America
   US: "northAmerica", CA: "northAmerica",
 
-  // Central America
   BZ: "centralAmerica", CR: "centralAmerica", SV: "centralAmerica",
   GT: "centralAmerica", HN: "centralAmerica", MX: "centralAmerica",
   NI: "centralAmerica", PA: "centralAmerica",
 
-  // Caribbean
   AG: "caribbean", BS: "caribbean", BB: "caribbean",
   CU: "caribbean", DM: "caribbean", DO: "caribbean",
   GD: "caribbean", HT: "caribbean", JM: "caribbean",
   KN: "caribbean", LC: "caribbean", VC: "caribbean",
   TT: "caribbean",
 
-  // South America
   AR: "southAmerica", BO: "southAmerica", BR: "southAmerica",
   CL: "southAmerica", CO: "southAmerica", EC: "southAmerica",
   GY: "southAmerica", PY: "southAmerica", PE: "southAmerica",
   SR: "southAmerica", UY: "southAmerica", VE: "southAmerica",
 
-  // Middle East
   BH: "middleEast", CY: "middleEast", IQ: "middleEast",
   IL: "middleEast", JO: "middleEast", KW: "middleEast",
   LB: "middleEast", OM: "middleEast", PS: "middleEast",
   QA: "middleEast", SA: "middleEast", SY: "middleEast",
   AE: "middleEast", YE: "middleEast", TR: "middleEast",
 
-  // North Africa
   DZ: "northAfrica", EG: "northAfrica", LY: "northAfrica",
   MA: "northAfrica", SD: "northAfrica", TN: "northAfrica",
 
-  // Sub-Saharan Africa
   AO: "subSaharanAfrica", BW: "subSaharanAfrica",
   CM: "subSaharanAfrica", CV: "subSaharanAfrica",
   CI: "subSaharanAfrica", CD: "subSaharanAfrica",
@@ -552,17 +642,14 @@ const COUNTRY_REGION = {
   UG: "subSaharanAfrica", ZM: "subSaharanAfrica",
   ZW: "subSaharanAfrica",
 
-  // East Asia
   CN: "eastAsia", HK: "eastAsia", JP: "eastAsia",
   KP: "eastAsia", KR: "eastAsia", MO: "eastAsia",
   MN: "eastAsia", TW: "eastAsia",
 
-  // South Asia
   AF: "southAsia", BD: "southAsia", BT: "southAsia",
   IN: "southAsia", MV: "southAsia", NP: "southAsia",
   PK: "southAsia", LK: "southAsia",
 
-  // South-East Asia
   BN: "southEastAsia", KH: "southEastAsia",
   ID: "southEastAsia", LA: "southEastAsia",
   MY: "southEastAsia", MM: "southEastAsia",
@@ -570,11 +657,9 @@ const COUNTRY_REGION = {
   TH: "southEastAsia", TL: "southEastAsia",
   VN: "southEastAsia",
 
-  // Central Asia
   KZ: "centralAsia", KG: "centralAsia", TJ: "centralAsia",
   TM: "centralAsia", UZ: "centralAsia",
 
-  // Oceania
   AU: "oceania", FJ: "oceania", KI: "oceania",
   MH: "oceania", FM: "oceania", NR: "oceania",
   NZ: "oceania", PW: "oceania", PG: "oceania",
@@ -845,6 +930,7 @@ function indicativeImportTax(
       )}% standard-rate indication applied across the estimated customs-value range. This is not a customs quote and does not include potentially applicable duty or carrier/clearance fees. ${rule.basis}`
   };
 }
+
 function customsDutyEstimate() {
   return {
     status: "unknown",
@@ -854,7 +940,9 @@ function customsDutyEstimate() {
     basis:
       "Not included. A defensible duty calculation normally requires product classification, origin and destination-specific tariff information."
   };
-}async function convertToGbp(amount, currency) {
+}
+
+async function convertToGbp(amount, currency) {
   const code = normaliseCurrency(currency);
 
   if (!code || code === "GBP") {
@@ -1231,10 +1319,16 @@ async function handleProductRequest(
     );
   }
 
-  const product =
+  let product =
     extractProductFromHtml(
       page.html
     );
+
+  if (!product) {
+    product = await fetchShopifyProduct(
+      target.toString()
+    );
+  }
 
   if (!product) {
     const shipping =
