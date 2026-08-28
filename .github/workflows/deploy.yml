@@ -17,31 +17,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Apply live-site UI fixes
-        shell: python
-        run: |
-          from pathlib import Path
-          p = Path("index.html")
-          s = p.read_text()
-
-          old = '''    .waiting-message{display:none;margin-top:15px;padding:13px 14px;border-radius:10px;background:#EEF2FB;color:var(--cobalt);font-size:13px;font-weight:650;line-height:1.4;text-align:center}\n    .waiting-message.show{display:block}\n    .waiting-message::after{content:"";display:inline-block;width:7px;height:7px;margin-left:7px;border-radius:50%;background:var(--orange);vertical-align:middle;animation:pulse 1s infinite ease-in-out}'''
-          new = '''    .waiting-message{display:none;margin-top:15px;padding:18px 20px;border-radius:14px;border:1px solid #F4C7AA;background:#FFF7F1;color:var(--cobalt);font-family:var(--serif);font-size:18px;font-weight:700;line-height:1.35;text-align:center;box-shadow:0 8px 24px rgba(243,106,33,.08)}\n    .waiting-message.show{display:block}\n    .waiting-message::after{content:"";display:inline-block;width:10px;height:10px;margin-left:9px;border-radius:50%;background:var(--orange);vertical-align:1px;animation:pulse 1s infinite ease-in-out}'''
-          if old not in s:
-              raise SystemExit("Expected waiting-message CSS was not found")
-          s = s.replace(old, new, 1)
-
-          replacements = {
-              '<div><span>Potential import charges</span><strong id="importTax">—</strong></div>': '<div><span>Estimated local taxes &amp; import charges</span><strong id="importTax">—</strong></div>',
-              '<div id="allInRow" style="display:none"><span>Potential overall cost</span><strong id="allInRange">—</strong></div>': '<div id="allInRow" style="display:none"><span>Potential total including local taxes</span><strong id="allInRange">—</strong></div>',
-              'Estimated amount payable to Get It, Send It.': 'Amount payable to Get It, Send It — before local taxes or import charges.',
-              'Import VAT, customs duty and carrier/clearance charges can depend on the product, value, origin, destination and the way the shipment is declared. Any figure shown here is indicative, not a guaranteed customs charge.': 'These are estimated destination-side taxes and import charges. They may be payable separately from your Get It, Send It payment, depending on the destination, product and customs arrangements. Any figure shown is indicative, not a guaranteed customs charge.'
-          }
-          for old_text, new_text in replacements.items():
-              s = s.replace(old_text, new_text)
-
-          p.write_text(s)
-          print("Applied live-site UI fixes to index.html")
-
       - name: Deploy Worker and set secrets
         uses: cloudflare/wrangler-action@v4
         with:
