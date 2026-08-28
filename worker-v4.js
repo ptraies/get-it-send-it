@@ -118,6 +118,63 @@ async function browserHMProduct(env, productUrl, articleCode, diagnostics = fals
   }
 }
 
+async function browserHMSearch(env, articleCode) {
+  const searchUrl = `https://www2.hm.com/en_gb/search-results.html?q=${encodeURIComponent(articleCode)}`;
+  const result = {
+    url: searchUrl,
+    articleCode,
+    bindingPresent: Boolean(env?.BROWSER),
+    quickActionPresent: Boolean(env?.BROWSER?.quickAction)
+  };
+
+  if (!env?.BROWSER?.quickAction) {
+    result.stage = "browser_binding_missing";
+    return result;
+  }
+
+  try {
+    const response = await env.BROWSER.quickAction("json", {
+      url: searchUrl,
+      prompt: `This is an H&M UK search-results page. Find the product whose article code is exactly ${articleCode}. Return only an exact match if present. Return its article code, product name, product URL, current selling price in GBP, and currency. Ignore all other search results, recommendations, banners, and navigation prices.`,
+      gotoOptions: { waitUntil: "networkidle2" },
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          type: "object",
+          properties: {
+            articleCode: { type: "string" },
+            name: { type: "string" },
+            url: { type: "string" },
+            price: { type: "number" },
+            currency: { type: "string" }
+          },
+          required: ["articleCode", "price"]
+        }
+      }
+    });
+
+    result.stage = "response_received";
+    result.httpStatus = response?.status ?? null;
+    result.contentType = response?.headers?.get("content-type") || null;
+    const raw = await response.clone().text();
+    result.rawPreview = raw.slice(0, 2500);
+    try {
+      const data = JSON.parse(raw);
+      result.result = data?.result || data?.data || data || null;
+    } catch {
+      result.stage = "non_json_response";
+    }
+
+    return result;
+  } catch (error) {
+    result.stage = "browser_exception";
+    result.errorName = error?.name || null;
+    result.errorMessage = String(error?.message || error);
+    result.errorStack = error?.stack ? String(error.stack).slice(0, 3000) : null;
+    return result;
+  }
+}
+
 async function probeHM(url, articleCode) {
   const started = Date.now();
   try {
@@ -176,11 +233,13 @@ async function hmApiDiagnostics(articleCode) {
   const candidates = [
     `https://www2.hm.com/hmwebservices/service/product/gb/availability/${baseProductCode}.json`,
     `https://tags.tiqcdn.com/dle/hm/hdl/${code}.json`,
-    `https://api.hm.com/search-services/v1/en_gb/listing/resultpage?query=${encodeURIComponent(code)}&page=1&pageSize=72&touchPoint=DESKTOP&pageId=search&categoryId=all`,
-    `https://api.hm.com/search-services/v1/en_gb/listing/resultpage?q=${encodeURIComponent(code)}&page=1&pageSize=72&touchPoint=DESKTOP&pageId=search&categoryId=all`,
-    `https://api.hm.com/search-services/v1/en_gb/listing/resultpage?searchTerm=${encodeURIComponent(code)}&page=1&pageSize=72&touchPoint=DESKTOP&pageId=search&categoryId=all`,
-    `https://api.hm.com/search-services/v1/en_gb/listing/resultpage?query=${encodeURIComponent(code)}&page=1&pageSize=72&touchPoint=WEB&pageId=search&categoryId=all`,
-    `https://api.hm.com/search-services/v1/en_gb/listing/resultpage?query=${encodeURIComponent(code)}&page=1&pageSize=72&touchPoint=desktop&pageId=search&categoryId=ladies` ,
+    `https://api.hm.com/search-services/v1/en_gb/listing/resultpage?query=${encodeURIComponent(code)}&page=1&pageSize=72&touchPoint=DESKTOP&pageId=search&categoryId=ladies_all`,
+    `https://api.hm.com/search-services/v1/en_gb/listing/resultpage?query=${encodeURIComponent(code)}&page=1&pageSize=72&touchPoint=DESKTOP&pageId=search&categoryId=ladies`,
+    `https://api.hm.com/search-services/v1/en_gb/listing/resultpage?searchTerm=${encodeURIComponent(code)}&page=1&pageSize=72&touchPoint=DESKTOP&pageId=search&categoryId=ladies_all`,
+    `https://api.hm.com/search-services/v1/en_gb/listing/resultpage?searchTerm=${encodeURIComponent(code)}&page=1&pageSize=72&touchPoint=DESKTOP&pageId=search&categoryId=ladies`,
+    `https://api.hm.com/search-services/v1/en_gb/listing/resultpage?q=${encodeURIComponent(code)}&page=1&pageSize=72&touchPoint=WEB&pageId=search&categoryId=ladies_all`,
+    `https://api.hm.com/search-services/v1/en_gb/listing/resultpage?q=${encodeURIComponent(code)}&page=1&pageSize=72&touchPoint=WEB&pageId=search&categoryId=ladies`,
+    `https://api.hm.com/search-services/v1/en_gb/listing/resultpage?query=${encodeURIComponent(code)}&page=1&pageSize=72&touchPoint=DESKTOP&pageId=1&categoryId=ladies_all`,
     `https://api.hm.com/search-services/v1/en_gb/listing/resultpage?query=${encodeURIComponent(code)}&page=1&pageSize=72&touchPoint=DESKTOP&pageId=1&categoryId=ladies`
   ];
   return Promise.all(candidates.map(url => probeHM(url, code)));
@@ -220,6 +279,13 @@ async function calculateEstimate(request, env, product) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    if (url.pathname === "/api/debug-hm-search" && request.method === "GET") {
+      const productUrl = url.searchParams.get("url");
+      const articleCode = productUrl ? getHMArticleCode(productUrl) : null;
+      if (!articleCode) return jsonResponse({ success: false, error: "Invalid H&M product URL." }, 400);
+      return jsonResponse({ success: true, articleCode, search: await browserHMSearch(env, articleCode) });
+    }
 
     if (url.pathname === "/api/debug-hm-api" && request.method === "GET") {
       const productUrl = url.searchParams.get("url");
