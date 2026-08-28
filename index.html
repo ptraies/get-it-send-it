@@ -24,1670 +24,251 @@
     }
 
     *{box-sizing:border-box}
-
     html{scroll-behavior:smooth}
-
-    body{
-      margin:0;
-      background:var(--cream);
-      color:var(--ink);
-      font-family:var(--sans);
-      line-height:1.5;
-    }
-
+    body{margin:0;background:var(--cream);color:var(--ink);font-family:var(--sans);line-height:1.5}
     a{color:inherit;text-decoration:none}
-
     button,input,select{font:inherit}
-
-    .wrap{
-      max-width:1120px;
-      margin:auto;
-      padding:0 28px;
-    }
-
-    header{
-      padding:28px 0;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-    }
-
-    .brand{
-      font-family:var(--serif);
-      font-weight:700;
-      font-size:25px;
-      line-height:.9;
-      letter-spacing:-.7px;
-      color:var(--cobalt);
-    }
-
+    .wrap{max-width:1120px;margin:auto;padding:0 28px}
+    header{padding:28px 0;display:flex;align-items:center;justify-content:space-between}
+    .brand{font-family:var(--serif);font-weight:700;font-size:25px;line-height:.9;letter-spacing:-.7px;color:var(--cobalt)}
     .brand span{color:var(--orange)}
+    nav{display:flex;gap:28px;font-size:14px;color:#4E5660}
+    nav a:hover{text-decoration:underline;text-underline-offset:4px}
+    .top-cta{border:1.5px solid var(--cobalt);border-radius:999px;padding:10px 17px;color:var(--cobalt);font-weight:650;font-size:14px}
+    .hero{padding:78px 0 96px}
+    .hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:70px;align-items:center}
+    h1{font-family:var(--serif);font-size:clamp(54px,7vw,84px);line-height:.93;letter-spacing:-3px;margin:0 0 25px;color:var(--cobalt);font-weight:700}
+    h1 em{font-style:normal;color:var(--orange)}
+    .lead{font-size:20px;max-width:560px;color:#414A55;margin:0 0 35px}
+    .estimate-card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px}
+    .field-label{font-size:12px;font-weight:750;letter-spacing:.04em;text-transform:uppercase;color:#69717A;margin-bottom:8px}
+    .url-row{display:flex;border:1px solid #CFC9BC;border-radius:13px;background:white;overflow:hidden}
+    .url-row input{border:0;outline:0;padding:16px;width:100%;min-width:0;color:var(--ink);background:white}
+    .country{margin-top:15px}
+    .country select{width:100%;padding:15px 16px;border:1px solid #CFC9BC;border-radius:13px;background:white;color:var(--ink);outline:none}
+    .manual-fields{display:none;margin-top:18px;padding-top:18px;border-top:1px solid var(--line)}
+    .manual-fields.show{display:block}
+    .manual-note{font-size:13px;color:#616A74;margin:0 0 15px}
+    .manual-field{margin-bottom:14px}
+    .manual-field input{width:100%;padding:14px 16px;border:1px solid #CFC9BC;border-radius:13px;background:white;color:var(--ink);outline:none}
+    .manual-field input:focus{border-color:var(--cobalt)}
+    .primary{width:100%;border:0;border-radius:13px;background:var(--orange);color:white;font-weight:800;padding:16px 20px;margin-top:15px;cursor:pointer;transition:transform .12s,filter .12s}
+    .primary:hover{filter:brightness(.96);transform:translateY(-1px)}
+    .primary:disabled{opacity:.7;cursor:wait;transform:none}
+    .tiny{font-size:12px;color:#7A7F84;text-align:center;margin:13px 0 0}
 
-    nav{
-      display:flex;
-      gap:28px;
-      font-size:14px;
-      color:#4E5660;
-    }
+    .waiting-message{display:none;margin-top:15px;padding:13px 14px;border-radius:10px;background:#EEF2FB;color:var(--cobalt);font-size:13px;font-weight:650;line-height:1.4;text-align:center}
+    .waiting-message.show{display:block}
+    .waiting-message::after{content:"";display:inline-block;width:7px;height:7px;margin-left:7px;border-radius:50%;background:var(--orange);vertical-align:middle;animation:pulse 1s infinite ease-in-out}
+    @keyframes pulse{0%,100%{opacity:.35;transform:scale(.85)}50%{opacity:1;transform:scale(1)}}
 
-    nav a:hover{
-      text-decoration:underline;
-      text-underline-offset:4px;
-    }
-
-    .top-cta{
-      border:1.5px solid var(--cobalt);
-      border-radius:999px;
-      padding:10px 17px;
-      color:var(--cobalt);
-      font-weight:650;
-      font-size:14px;
-    }
-
-    .hero{
-      padding:78px 0 96px;
-    }
-
-    .hero-grid{
-      display:grid;
-      grid-template-columns:1.05fr .95fr;
-      gap:70px;
-      align-items:center;
-    }
-
-    h1{
-      font-family:var(--serif);
-      font-size:clamp(54px,7vw,84px);
-      line-height:.93;
-      letter-spacing:-3px;
-      margin:0 0 25px;
-      color:var(--cobalt);
-      font-weight:700;
-    }
-
-    h1 em{
-      font-style:normal;
-      color:var(--orange);
-    }
-
-    .lead{
-      font-size:20px;
-      max-width:560px;
-      color:#414A55;
-      margin:0 0 35px;
-    }
-
-    .estimate-card{
-      background:var(--paper);
-      border:1px solid var(--line);
-      border-radius:var(--radius);
-      box-shadow:var(--shadow);
-      padding:24px;
-    }
-
-    .field-label{
-      font-size:12px;
-      font-weight:750;
-      letter-spacing:.04em;
-      text-transform:uppercase;
-      color:#69717A;
-      margin-bottom:8px;
-    }
-
-    .url-row{
-      display:flex;
-      border:1px solid #CFC9BC;
-      border-radius:13px;
-      background:white;
-      overflow:hidden;
-    }
-
-    .url-row input{
-      border:0;
-      outline:0;
-      padding:16px;
-      width:100%;
-      min-width:0;
-      color:var(--ink);
-      background:white;
-    }
-
-    .country{
-      margin-top:15px;
-    }
-
-    .country select{
-      width:100%;
-      padding:15px 16px;
-      border:1px solid #CFC9BC;
-      border-radius:13px;
-      background:white;
-      color:var(--ink);
-      outline:none;
-    }
-
-    .manual-fields{
-      display:none;
-      margin-top:18px;
-      padding-top:18px;
-      border-top:1px solid var(--line);
-    }
-
-    .manual-fields.show{
-      display:block;
-    }
-
-    .manual-note{
-      font-size:13px;
-      color:#616A74;
-      margin:0 0 15px;
-    }
-
-    .manual-field{
-      margin-bottom:14px;
-    }
-
-    .manual-field input{
-      width:100%;
-      padding:14px 16px;
-      border:1px solid #CFC9BC;
-      border-radius:13px;
-      background:white;
-      color:var(--ink);
-      outline:none;
-    }
-
-    .manual-field input:focus{
-      border-color:var(--cobalt);
-    }
-
-    .primary{
-      width:100%;
-      border:0;
-      border-radius:13px;
-      background:var(--orange);
-      color:white;
-      font-weight:800;
-      padding:16px 20px;
-      margin-top:15px;
-      cursor:pointer;
-      transition:transform .12s,filter .12s;
-    }
-
-    .primary:hover{
-      filter:brightness(.96);
-      transform:translateY(-1px);
-    }
-
-    .primary:disabled{
-      opacity:.7;
-      cursor:wait;
-      transform:none;
-    }
-
-    .tiny{
-      font-size:12px;
-      color:#7A7F84;
-      text-align:center;
-      margin:13px 0 0;
-    }
-
-    .example-wrap{
-      margin-top:28px;
-    }
-
-    .example-wrap h2{
-      font-size:34px;
-      margin-bottom:8px;
-    }
-
-    .example-card{
-      margin-top:18px;
-    }
-
-    .example-card .breakdown div:last-child{
-      border-bottom:0;
-      padding-top:12px;
-      font-weight:750;
-      color:var(--ink);
-    }
-
-    .example-card .breakdown div:last-child strong{
-      color:var(--orange);
-    }
-
-    .visual{
-      position:relative;
-      min-height:420px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-    }
-
-    .blob{
-      width:350px;
-      height:350px;
-      border-radius:47% 53% 55% 45%/48% 45% 55% 52%;
-      background:#E5EAF7;
-      position:absolute;
-    }
-
-    .note{
-      position:relative;
-      width:310px;
-      background:var(--paper);
-      border:1px solid var(--line);
-      border-radius:20px;
-      padding:28px;
-      box-shadow:var(--shadow);
-      transform:rotate(2.5deg);
-    }
-
-    .note-top{
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      margin-bottom:32px;
-    }
-
-    .dot{
-      width:11px;
-      height:11px;
-      background:var(--orange);
-      border-radius:50%;
-    }
-
-    .mini-label{
-      font-size:11px;
-      color:#7C838B;
-      text-transform:uppercase;
-      letter-spacing:.08em;
-      font-weight:800;
-    }
-
-    .fake-line{
-      height:9px;
-      border-radius:99px;
-      background:#E8E4DA;
-      margin:10px 0;
-    }
-
+    .example-wrap{margin-top:28px}
+    .example-wrap h2{font-size:34px;margin-bottom:8px}
+    .example-card{margin-top:18px}
+    .example-card .breakdown div:last-child{border-bottom:0;padding-top:12px;font-weight:750;color:var(--ink)}
+    .example-card .breakdown div:last-child strong{color:var(--orange)}
+    .visual{position:relative;min-height:420px;display:flex;align-items:center;justify-content:center}
+    .blob{width:350px;height:350px;border-radius:47% 53% 55% 45%/48% 45% 55% 52%;background:#E5EAF7;position:absolute}
+    .note{position:relative;width:310px;background:var(--paper);border:1px solid var(--line);border-radius:20px;padding:28px;box-shadow:var(--shadow);transform:rotate(2.5deg)}
+    .note-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:32px}
+    .dot{width:11px;height:11px;background:var(--orange);border-radius:50%}
+    .mini-label{font-size:11px;color:#7C838B;text-transform:uppercase;letter-spacing:.08em;font-weight:800}
+    .fake-line{height:9px;border-radius:99px;background:#E8E4DA;margin:10px 0}
     .fake-line.short{width:62%}
-
-    .price{
-      font-family:var(--serif);
-      font-size:48px;
-      color:var(--cobalt);
-      margin-top:25px;
-    }
-
-    .arrow{
-      color:var(--orange);
-      font-size:38px;
-      margin-left:4px;
-    }
-
-    .intro{
-      padding:70px 0;
-      border-top:1px solid var(--line);
-    }
-
+    .price{font-family:var(--serif);font-size:48px;color:var(--cobalt);margin-top:25px}
+    .arrow{color:var(--orange);font-size:38px;margin-left:4px}
+    .intro{padding:70px 0;border-top:1px solid var(--line)}
     .center{text-align:center}
-
-    .eyebrow{
-      font-size:12px;
-      letter-spacing:.13em;
-      text-transform:uppercase;
-      font-weight:850;
-      color:var(--orange);
-    }
-
-    h2{
-      font-family:var(--serif);
-      font-size:46px;
-      line-height:1;
-      margin:10px 0 15px;
-      color:var(--cobalt);
-      letter-spacing:-1.5px;
-    }
-
-    .sub{
-      color:#59626D;
-      max-width:620px;
-      margin:0 auto;
-    }
-
-    .steps{
-      display:grid;
-      grid-template-columns:repeat(3,1fr);
-      gap:24px;
-      margin-top:48px;
-    }
-
-    .step{
-      padding:28px;
-      background:var(--paper);
-      border:1px solid var(--line);
-      border-radius:16px;
-    }
-
-    .num{
-      font-family:var(--serif);
-      font-size:28px;
-      color:var(--orange);
-    }
-
-    .step h3{
-      font-family:var(--serif);
-      font-size:25px;
-      color:var(--cobalt);
-      margin:8px 0;
-    }
-
-    .step p{
-      margin:0;
-      color:#616A74;
-      font-size:15px;
-    }
-
-    .estimate-result{
-      display:none;
-      margin-top:18px;
-      border-top:1px solid var(--line);
-      padding-top:18px;
-    }
-
+    .eyebrow{font-size:12px;letter-spacing:.13em;text-transform:uppercase;font-weight:850;color:var(--orange)}
+    h2{font-family:var(--serif);font-size:46px;line-height:1;margin:10px 0 15px;color:var(--cobalt);letter-spacing:-1.5px}
+    .sub{color:#59626D;max-width:620px;margin:0 auto}
+    .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:48px}
+    .step{padding:28px;background:var(--paper);border:1px solid var(--line);border-radius:16px}
+    .num{font-family:var(--serif);font-size:28px;color:var(--orange)}
+    .step h3{font-family:var(--serif);font-size:25px;color:var(--cobalt);margin:8px 0}
+    .step p{margin:0;color:#616A74;font-size:15px}
+    .estimate-result{display:none;margin-top:18px;border-top:1px solid var(--line);padding-top:18px}
     .estimate-result.show{display:block}
-
-    .result-title{
-      font-family:var(--serif);
-      font-size:26px;
-      color:var(--cobalt);
-    }
-
-    .range{
-      font-family:var(--serif);
-      font-size:42px;
-      color:var(--orange);
-      margin:4px 0 10px;
-    }
-
-    .breakdown{
-      font-size:13px;
-      color:#616A74;
-    }
-
-    .breakdown div{
-      display:flex;
-      justify-content:space-between;
-      gap:20px;
-      border-bottom:1px dashed #DDD8CC;
-      padding:7px 0;
-    }
-
-    .caveat{
-      font-size:11px;
-      color:#7A7F84;
-      margin-top:12px;
-      line-height:1.5;
-    }
-
-    .error-message{
-      display:none;
-      margin-top:15px;
-      padding:12px 14px;
-      border-radius:10px;
-      background:#FFF1EA;
-      color:#9C421D;
-      font-size:13px;
-      line-height:1.4;
-    }
-
-    .error-message.show{
-      display:block;
-    }
-
-    .final-cta{
-      padding:80px 0;
-      background:var(--cobalt);
-      color:white;
-      text-align:center;
-    }
-
+    .result-title{font-family:var(--serif);font-size:26px;color:var(--cobalt)}
+    .range{font-family:var(--serif);font-size:42px;color:var(--orange);margin:4px 0 10px}
+    .breakdown{font-size:13px;color:#616A74}
+    .breakdown div{display:flex;justify-content:space-between;gap:20px;border-bottom:1px dashed #DDD8CC;padding:7px 0}
+    .caveat{font-size:11px;color:#7A7F84;margin-top:12px;line-height:1.5}
+    .error-message{display:none;margin-top:15px;padding:12px 14px;border-radius:10px;background:#FFF1EA;color:#9C421D;font-size:13px;line-height:1.4}
+    .error-message.show{display:block}
+    .final-cta{padding:80px 0;background:var(--cobalt);color:white;text-align:center}
     .final-cta h2{color:white}
-
-    .final-cta p{
-      color:#E9EDF8;
-      max-width:560px;
-      margin:0 auto 24px;
-    }
-
-    footer{
-      padding:28px 0;
-      display:flex;
-      justify-content:space-between;
-      gap:20px;
-      color:#6D737A;
-      font-size:13px;
-    }
-
-    @media(max-width:820px){
-
-      nav{display:none}
-
-      .hero{padding-top:45px}
-
-      .hero-grid{
-        grid-template-columns:1fr;
-        gap:40px;
-      }
-
-      .visual{min-height:320px}
-
-      .blob{
-        width:290px;
-        height:290px;
-      }
-
-      .steps{
-        grid-template-columns:1fr;
-      }
-
-      h1{font-size:58px}
-
-      h2{font-size:38px}
-
-      .example-wrap h2{font-size:32px}
-    }
+    .final-cta p{color:#E9EDF8;max-width:560px;margin:0 auto 24px}
+    footer{padding:28px 0;display:flex;justify-content:space-between;gap:20px;color:#6D737A;font-size:13px}
+    @media(max-width:820px){nav{display:none}.hero{padding-top:45px}.hero-grid{grid-template-columns:1fr;gap:40px}.visual{min-height:320px}.blob{width:290px;height:290px}.steps{grid-template-columns:1fr}h1{font-size:58px}h2{font-size:38px}.example-wrap h2{font-size:32px}}
   </style>
 </head>
-
 <body>
-
 <header class="wrap">
-
-  <a class="brand" href="#">
-    GET IT,<br><span>SEND IT.</span>
-  </a>
-
-  <nav>
-    <a href="#how">How it works</a>
-    <a href="#estimate">Estimate</a>
-    <a href="#faq">FAQs</a>
-  </nav>
-
-  <a class="top-cta" href="#estimate">
-    Get an estimate
-  </a>
-
+  <a class="brand" href="#">GET IT,<br><span>SEND IT.</span></a>
+  <nav><a href="#how">How it works</a><a href="#estimate">Estimate</a><a href="#faq">FAQs</a></nav>
+  <a class="top-cta" href="#estimate">Get an estimate</a>
 </header>
-
-
 <main>
-
 <section class="hero wrap" id="estimate">
-
   <div class="hero-grid">
-
     <div>
-
-      <h1>
-        Can't buy it<br>
-        where you live?<br>
-        <em>Send us the link.</em>
-      </h1>
-
-      <p class="lead">
-        You find it. We get it. See roughly what it will cost before you do anything else.
-      </p>
-
-
+      <h1>Can't buy it<br>where you live?<br><em>Send us the link.</em></h1>
+      <p class="lead">You find it. We get it. See roughly what it will cost before you do anything else.</p>
       <div class="estimate-card">
-
-        <div class="field-label">
-          Product link
-        </div>
-
-        <div class="url-row">
-          <input
-            id="url"
-            type="url"
-            placeholder="Paste the product link here"
-            autocomplete="off"
-          >
-        </div>
-
-
-        <div class="country">
-
-          <div class="field-label">
-            Deliver to
-          </div>
-
-          <select id="country" aria-label="Destination country">
-            <option value="">Choose a country</option>
-          </select>
-
-        </div>
-
-
-        <button class="primary" id="estimateBtn">
-          GET MY ESTIMATE →
-        </button>
-
-
-        <div class="tiny">
-          No account. No email. No obligation.
-        </div>
-
-
+        <div class="field-label">Product link</div>
+        <div class="url-row"><input id="url" type="url" placeholder="Paste the product link here" autocomplete="off"></div>
+        <div class="country"><div class="field-label">Deliver to</div><select id="country" aria-label="Destination country"><option value="">Choose a country</option></select></div>
+        <button class="primary" id="estimateBtn">GET MY ESTIMATE →</button>
+        <div class="tiny">No account. No email. No obligation.</div>
+        <div class="waiting-message" id="waitingMessage" aria-live="polite">We're calculating how much it'll cost to get this to you!</div>
         <div class="error-message" id="errorMessage"></div>
-
-
         <div class="manual-fields" id="manualFields">
-
-          <div class="field-label">
-            We need the price
-          </div>
-
-          <p class="manual-note" id="manualNote">
-            We couldn't automatically retrieve the product price. Enter the product price in GBP. If you know the retailer's delivery charge to the UK, enter it too. If you don't know it, leave it blank. We won't invent a delivery charge we cannot establish.
-          </p>
-
-
-          <div class="manual-field">
-
-            <div class="field-label">
-              Product price (£)
-            </div>
-
-            <input
-              id="manualProduct"
-              type="number"
-              min="0"
-              step="0.01"
-              inputmode="decimal"
-              placeholder="e.g. 39.99"
-            >
-
-          </div>
-
-
-          <div class="manual-field">
-
-            <div class="field-label">
-              UK delivery to us (£) <span style="font-weight:500;text-transform:none;letter-spacing:0">(optional)</span>
-            </div>
-
-            <input
-              id="manualDelivery"
-              type="number"
-              min="0"
-              step="0.01"
-              inputmode="decimal"
-              placeholder="Leave blank if unknown"
-            >
-
-          </div>
-
-
-          <button
-            class="primary"
-            id="manualEstimateBtn"
-            type="button"
-          >
-            UPDATE MY ESTIMATE →
-          </button>
-
+          <div class="field-label">We need the price</div>
+          <p class="manual-note" id="manualNote">We couldn't automatically retrieve the product price. Enter the product price in GBP. If you know the retailer's delivery charge to the UK, enter it too. If you don't know it, leave it blank. We won't invent a delivery charge we cannot establish.</p>
+          <div class="manual-field"><div class="field-label">Product price (£)</div><input id="manualProduct" type="number" min="0" step="0.01" inputmode="decimal" placeholder="e.g. 39.99"></div>
+          <div class="manual-field"><div class="field-label">UK delivery to us (£) <span style="font-weight:500;text-transform:none;letter-spacing:0">(optional)</span></div><input id="manualDelivery" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Leave blank if unknown"></div>
+          <button class="primary" id="manualEstimateBtn" type="button">UPDATE MY ESTIMATE →</button>
         </div>
-
-
         <div class="estimate-result" id="result">
-
-          <div class="result-title">
-            Your estimate
-          </div>
-
-          <div class="range" id="range">
-            £—
-          </div>
-
-          <div class="tiny" id="rangeLabel" style="text-align:left;margin:0 0 12px">
-            Estimated amount payable to Get It, Send It.
-          </div>
-
-
+          <div class="result-title">Your estimate</div>
+          <div class="range" id="range">£—</div>
+          <div class="tiny" id="rangeLabel" style="text-align:left;margin:0 0 12px">Estimated amount payable to Get It, Send It.</div>
           <div class="breakdown">
-
-            <div>
-              <span>Product</span>
-              <strong id="productCost">£—</strong>
-            </div>
-
-            <div>
-              <span>UK delivery to us</span>
-              <strong id="ukDelivery">£—</strong>
-            </div>
-
-            <div>
-              <span>Get It, Send It Service Fee</span>
-              <strong id="serviceFee">£—</strong>
-            </div>
-
-            <div>
-              <span>International delivery</span>
-              <strong id="intlShipping">£—</strong>
-            </div>
-
-            <div>
-              <span>Potential import charges</span>
-              <strong id="importTax">—</strong>
-            </div>
-
-            <div id="allInRow" style="display:none">
-              <span>Potential overall cost</span>
-              <strong id="allInRange">—</strong>
-            </div>
-
+            <div><span>Product</span><strong id="productCost">£—</strong></div>
+            <div><span>UK delivery to us</span><strong id="ukDelivery">£—</strong></div>
+            <div><span>Get It, Send It Service Fee</span><strong id="serviceFee">£—</strong></div>
+            <div><span>International delivery</span><strong id="intlShipping">£—</strong></div>
+            <div><span>Potential import charges</span><strong id="importTax">—</strong></div>
+            <div id="allInRow" style="display:none"><span>Potential overall cost</span><strong id="allInRange">—</strong></div>
           </div>
-
-          <div class="caveat" id="shippingBasis">
-            Shipping figures are estimates unless the retailer or carrier has supplied an exact charge.
-          </div>
-
-          <div class="caveat" id="taxCaveat">
-            Import VAT, customs duty and carrier/clearance charges can depend on the product, value, origin, destination and the way the shipment is declared. Any figure shown here is indicative, not a guaranteed customs charge.
-          </div>
-
+          <div class="caveat" id="shippingBasis">Shipping figures are estimates unless the retailer or carrier has supplied an exact charge.</div>
+          <div class="caveat" id="taxCaveat">Import VAT, customs duty and carrier/clearance charges can depend on the product, value, origin, destination and the way the shipment is declared. Any figure shown here is indicative, not a guaranteed customs charge.</div>
         </div>
-
       </div>
-
-
       <div class="example-wrap">
-
-        <div class="eyebrow">
-          See how it works
-        </div>
-
-        <h2 style="margin-top:10px">
-          See what your estimate could look like.
-        </h2>
-
-        <p class="sub" style="margin:0 0 18px;max-width:none">
-          Here’s an example using a £22.99 product shipped from the UK to New Zealand.
-        </p>
-
+        <div class="eyebrow">See how it works</div>
+        <h2 style="margin-top:10px">See what your estimate could look like.</h2>
+        <p class="sub" style="margin:0 0 18px;max-width:none">Here’s an example using a £22.99 product shipped from the UK to New Zealand.</p>
         <div class="estimate-card example-card">
-
-          <div class="result-title">
-            Example estimate
-          </div>
-
-          <div class="tiny" style="text-align:left;margin:4px 0 14px">
-            Illustrative example only — not a quote.
-          </div>
-
+          <div class="result-title">Example estimate</div>
+          <div class="tiny" style="text-align:left;margin:4px 0 14px">Illustrative example only — not a quote.</div>
           <div class="breakdown">
-
-            <div>
-              <span>Product</span>
-              <strong>£22.99</strong>
-            </div>
-
-            <div>
-              <span>UK delivery to us</span>
-              <strong>~£0.00</strong>
-            </div>
-
-            <div>
-              <span>Get It, Send It Service Fee</span>
-              <strong>£15.00</strong>
-            </div>
-
-            <div>
-              <span>International delivery</span>
-              <strong>~£25.00–£43.00</strong>
-            </div>
-
-            <div>
-              <span>Potential import charges</span>
-              <strong>~£7.20–£9.90</strong>
-            </div>
-
-            <div>
-              <span>Potential overall cost</span>
-              <strong>~£70.19–£90.89</strong>
-            </div>
-
+            <div><span>Product</span><strong>£22.99</strong></div>
+            <div><span>UK delivery to us</span><strong>~£0.00</strong></div>
+            <div><span>Get It, Send It Service Fee</span><strong>£15.00</strong></div>
+            <div><span>International delivery</span><strong>~£25.00–£43.00</strong></div>
+            <div><span>Potential import charges</span><strong>~£7.20–£9.90</strong></div>
+            <div><span>Potential overall cost</span><strong>~£70.19–£90.89</strong></div>
           </div>
-
-          <div class="caveat">
-            Shipping and import charges in this example are indicative only and are not guaranteed.
-          </div>
-
-          <div class="caveat">
-            Actual costs can vary depending on the product, package, carrier, destination, customs valuation and applicable taxes or duties. Your final costs will only be confirmed when we provide an actual quote.
-          </div>
-
+          <div class="caveat">Shipping and import charges in this example are indicative only and are not guaranteed.</div>
+          <div class="caveat">Actual costs can vary depending on the product, package, carrier, destination, customs valuation and applicable taxes or duties. Your final costs will only be confirmed when we provide an actual quote.</div>
         </div>
-
       </div>
-
     </div>
-
-
-    <div class="visual" aria-hidden="true">
-
-      <div class="blob"></div>
-
-      <div class="note">
-
-        <div class="note-top">
-
-          <div class="mini-label">
-            GET IT, SEND IT.
-          </div>
-
-          <div class="dot"></div>
-
-        </div>
-
-        <div class="mini-label">
-          YOUR ESTIMATE
-        </div>
-
-        <div class="fake-line"></div>
-        <div class="fake-line short"></div>
-        <div class="fake-line"></div>
-
-        <div class="price">
-          £84–£92
-          <span class="arrow">→</span>
-        </div>
-
-        <div class="mini-label">
-          NO EMAIL. NO WAITING.
-        </div>
-
-      </div>
-
-    </div>
-
+    <div class="visual" aria-hidden="true"><div class="blob"></div><div class="note"><div class="note-top"><div class="mini-label">GET IT, SEND IT.</div><div class="dot"></div></div><div class="mini-label">YOUR ESTIMATE</div><div class="fake-line"></div><div class="fake-line short"></div><div class="fake-line"></div><div class="price">£84–£92 <span class="arrow">→</span></div><div class="mini-label">NO EMAIL. NO WAITING.</div></div></div>
   </div>
-
 </section>
-
-
-<section class="intro" id="how">
-
-  <div class="wrap center">
-
-    <div class="eyebrow">
-      How it works
-    </div>
-
-    <h2>
-      Three simple steps.
-    </h2>
-
-    <p class="sub">
-      No account to create. No complicated forwarding service to learn. Just tell us what you want.
-    </p>
-
-
-    <div class="steps">
-
-      <article class="step">
-
-        <div class="num">01</div>
-
-        <h3>
-          Send us the link.
-        </h3>
-
-        <p>
-          You've found something you want. Paste the product link and tell us where it needs to go.
-        </p>
-
-      </article>
-
-
-      <article class="step">
-
-        <div class="num">02</div>
-
-        <h3>
-          Get your estimate.
-        </h3>
-
-        <p>
-          We'll show the likely delivered cost, including our fee and estimated international delivery.
-        </p>
-
-      </article>
-
-
-      <article class="step">
-
-        <div class="num">03</div>
-
-        <h3>
-          Get your stuff.
-        </h3>
-
-        <p>
-          Happy with the final quote? We buy it, receive it in the UK and send it on to you.
-        </p>
-
-      </article>
-
-    </div>
-
-  </div>
-
-</section>
-
-
-<section class="final-cta">
-
-  <div class="wrap">
-
-    <div
-      class="eyebrow"
-      style="color:#FF8B4A"
-    >
-      Found something?
-    </div>
-
-    <h2>
-      Don't overthink it.
-    </h2>
-
-    <p>
-      Send us the link and we'll tell you what getting it to you is likely to cost.
-    </p>
-
-    <a
-      class="top-cta"
-      style="display:inline-block;background:var(--orange);border-color:var(--orange);color:white"
-      href="#estimate"
-    >
-      GET MY ESTIMATE →
-    </a>
-
-  </div>
-
-</section>
-
+<section class="intro" id="how"><div class="wrap center"><div class="eyebrow">How it works</div><h2>Three simple steps.</h2><p class="sub">No account to create. No complicated forwarding service to learn. Just tell us what you want.</p><div class="steps"><article class="step"><div class="num">01</div><h3>Send us the link.</h3><p>You've found something you want. Paste the product link and tell us where it needs to go.</p></article><article class="step"><div class="num">02</div><h3>Get your estimate.</h3><p>We'll show the likely delivered cost, including our fee and estimated international delivery.</p></article><article class="step"><div class="num">03</div><h3>Get your stuff.</h3><p>Happy with the final quote? We buy it, receive it in the UK and send it on to you.</p></article></div></div></section>
+<section class="final-cta"><div class="wrap"><div class="eyebrow" style="color:#FF8B4A">Found something?</div><h2>Don't overthink it.</h2><p>Send us the link and we'll tell you what getting it to you is likely to cost.</p><a class="top-cta" style="display:inline-block;background:var(--orange);border-color:var(--orange);color:white" href="#estimate">GET MY ESTIMATE →</a></div></section>
 </main>
-
-
-<footer class="wrap" id="faq">
-
-  <div>
-    © 2026 Get It, Send It.
-  </div>
-
-  <div>
-    FAQs · Terms · Privacy
-  </div>
-
-</footer>
-
-
+<footer class="wrap" id="faq"><div>© 2026 Get It, Send It.</div><div>FAQs · Terms · Privacy</div></footer>
 <script>
+  const btn=document.getElementById("estimateBtn");
+  const manualBtn=document.getElementById("manualEstimateBtn");
+  const url=document.getElementById("url");
+  const country=document.getElementById("country");
+  const result=document.getElementById("result");
+  const errorMessage=document.getElementById("errorMessage");
+  const waitingMessage=document.getElementById("waitingMessage");
+  const manualFields=document.getElementById("manualFields");
+  const manualProduct=document.getElementById("manualProduct");
+  const manualDelivery=document.getElementById("manualDelivery");
 
-  /*
-    Front-end rules:
-    - The Worker is the source of truth for shipping/tax estimates.
-    - This page never invents a tax or shipping rate.
-    - Exact retailer/carrier charges are preferred where supplied.
-    - Indicative figures are labelled as such.
-  */
-
-  const btn = document.getElementById("estimateBtn");
-  const manualBtn = document.getElementById("manualEstimateBtn");
-  const url = document.getElementById("url");
-  const country = document.getElementById("country");
-  const result = document.getElementById("result");
-  const errorMessage = document.getElementById("errorMessage");
-  const manualFields = document.getElementById("manualFields");
-  const manualNote = document.getElementById("manualNote");
-  const manualProduct = document.getElementById("manualProduct");
-  const manualDelivery = document.getElementById("manualDelivery");
-
-
-  /*
-    ISO 3166-1 alpha-2 destination list.
-    The Worker remains responsible for whether it has a
-    shipping/tax rule for a particular destination.
-  */
-
-  const COUNTRIES = [
-    ["AF","Afghanistan"],["AL","Albania"],["DZ","Algeria"],["AD","Andorra"],["AO","Angola"],
-    ["AG","Antigua and Barbuda"],["AR","Argentina"],["AM","Armenia"],["AU","Australia"],
-    ["AT","Austria"],["AZ","Azerbaijan"],["BS","Bahamas"],["BH","Bahrain"],["BD","Bangladesh"],
-    ["BB","Barbados"],["BY","Belarus"],["BE","Belgium"],["BZ","Belize"],["BJ","Benin"],
-    ["BT","Bhutan"],["BO","Bolivia"],["BA","Bosnia and Herzegovina"],["BW","Botswana"],
-    ["BR","Brazil"],["BN","Brunei"],["BG","Bulgaria"],["BF","Burkina Faso"],["BI","Burundi"],
-    ["CV","Cabo Verde"],["KH","Cambodia"],["CM","Cameroon"],["CA","Canada"],
-    ["CF","Central African Republic"],["TD","Chad"],["CL","Chile"],["CN","China"],
-    ["CO","Colombia"],["KM","Comoros"],["CG","Congo"],["CD","Congo, Democratic Republic"],
-    ["CR","Costa Rica"],["CI","Côte d'Ivoire"],["HR","Croatia"],["CU","Cuba"],["CY","Cyprus"],
-    ["CZ","Czechia"],["DK","Denmark"],["DJ","Djibouti"],["DM","Dominica"],
-    ["DO","Dominican Republic"],["EC","Ecuador"],["EG","Egypt"],["SV","El Salvador"],
-    ["GQ","Equatorial Guinea"],["ER","Eritrea"],["EE","Estonia"],["SZ","Eswatini"],
-    ["ET","Ethiopia"],["FJ","Fiji"],["FI","Finland"],["FR","France"],["GA","Gabon"],
-    ["GM","Gambia"],["GE","Georgia"],["DE","Germany"],["GH","Ghana"],["GR","Greece"],
-    ["GD","Grenada"],["GT","Guatemala"],["GN","Guinea"],["GW","Guinea-Bissau"],
-    ["GY","Guyana"],["HT","Haiti"],["HN","Honduras"],["HU","Hungary"],["IS","Iceland"],
-    ["IN","India"],["ID","Indonesia"],["IR","Iran"],["IQ","Iraq"],["IE","Ireland"],
-    ["IL","Israel"],["IT","Italy"],["JM","Jamaica"],["JP","Japan"],["JO","Jordan"],
-    ["KZ","Kazakhstan"],["KE","Kenya"],["KI","Kiribati"],["KP","North Korea"],
-    ["KR","South Korea"],["KW","Kuwait"],["KG","Kyrgyzstan"],["LA","Laos"],["LV","Latvia"],
-    ["LB","Lebanon"],["LS","Lesotho"],["LR","Liberia"],["LY","Libya"],["LI","Liechtenstein"],
-    ["LT","Lithuania"],["LU","Luxembourg"],["MG","Madagascar"],["MW","Malawi"],
-    ["MY","Malaysia"],["MV","Maldives"],["ML","Mali"],["MT","Malta"],["MH","Marshall Islands"],
-    ["MR","Mauritania"],["MU","Mauritius"],["MX","Mexico"],["FM","Micronesia"],
-    ["MD","Moldova"],["MC","Monaco"],["MN","Mongolia"],["ME","Montenegro"],["MA","Morocco"],
-    ["MZ","Mozambique"],["MM","Myanmar"],["NA","Namibia"],["NR","Nauru"],["NP","Nepal"],
-    ["NL","Netherlands"],["NZ","New Zealand"],["NI","Nicaragua"],["NE","Niger"],
-    ["NG","Nigeria"],["MK","North Macedonia"],["NO","Norway"],["OM","Oman"],["PK","Pakistan"],
-    ["PW","Palau"],["PS","Palestine"],["PA","Panama"],["PG","Papua New Guinea"],
-    ["PY","Paraguay"],["PE","Peru"],["PH","Philippines"],["PL","Poland"],["PT","Portugal"],
-    ["QA","Qatar"],["RO","Romania"],["RU","Russia"],["RW","Rwanda"],["KN","Saint Kitts and Nevis"],
-    ["LC","Saint Lucia"],["VC","Saint Vincent and the Grenadines"],["WS","Samoa"],
-    ["SM","San Marino"],["ST","Sao Tome and Principe"],["SA","Saudi Arabia"],
-    ["SN","Senegal"],["RS","Serbia"],["SC","Seychelles"],["SL","Sierra Leone"],
-    ["SG","Singapore"],["SK","Slovakia"],["SI","Slovenia"],["SB","Solomon Islands"],
-    ["SO","Somalia"],["ZA","South Africa"],["SS","South Sudan"],["ES","Spain"],
-    ["LK","Sri Lanka"],["SD","Sudan"],["SR","Suriname"],["SE","Sweden"],["CH","Switzerland"],
-    ["SY","Syria"],["TW","Taiwan"],["TJ","Tajikistan"],["TZ","Tanzania"],["TH","Thailand"],
-    ["TL","Timor-Leste"],["TG","Togo"],["TO","Tonga"],["TT","Trinidad and Tobago"],
-    ["TN","Tunisia"],["TR","Türkiye"],["TM","Turkmenistan"],["TV","Tuvalu"],["UG","Uganda"],
-    ["UA","Ukraine"],["AE","United Arab Emirates"],["GB","United Kingdom"],["US","United States"],
-    ["UY","Uruguay"],["UZ","Uzbekistan"],["VU","Vanuatu"],["VA","Vatican City"],
-    ["VE","Venezuela"],["VN","Vietnam"],["YE","Yemen"],["ZM","Zambia"],["ZW","Zimbabwe"]
+  const COUNTRIES=[
+    ["AF","Afghanistan"],["AL","Albania"],["DZ","Algeria"],["AD","Andorra"],["AO","Angola"],["AG","Antigua and Barbuda"],["AR","Argentina"],["AM","Armenia"],["AU","Australia"],["AT","Austria"],["AZ","Azerbaijan"],["BS","Bahamas"],["BH","Bahrain"],["BD","Bangladesh"],["BB","Barbados"],["BY","Belarus"],["BE","Belgium"],["BZ","Belize"],["BJ","Benin"],["BT","Bhutan"],["BO","Bolivia"],["BA","Bosnia and Herzegovina"],["BW","Botswana"],["BR","Brazil"],["BN","Brunei"],["BG","Bulgaria"],["BF","Burkina Faso"],["BI","Burundi"],["CV","Cabo Verde"],["KH","Cambodia"],["CM","Cameroon"],["CA","Canada"],["CF","Central African Republic"],["TD","Chad"],["CL","Chile"],["CN","China"],["CO","Colombia"],["KM","Comoros"],["CG","Congo"],["CD","Congo, Democratic Republic"],["CR","Costa Rica"],["CI","Côte d'Ivoire"],["HR","Croatia"],["CU","Cuba"],["CY","Cyprus"],["CZ","Czechia"],["DK","Denmark"],["DJ","Djibouti"],["DM","Dominica"],["DO","Dominican Republic"],["EC","Ecuador"],["EG","Egypt"],["SV","El Salvador"],["GQ","Equatorial Guinea"],["ER","Eritrea"],["EE","Estonia"],["SZ","Eswatini"],["ET","Ethiopia"],["FJ","Fiji"],["FI","Finland"],["FR","France"],["GA","Gabon"],["GM","Gambia"],["GE","Georgia"],["DE","Germany"],["GH","Ghana"],["GR","Greece"],["GD","Grenada"],["GT","Guatemala"],["GN","Guinea"],["GW","Guinea-Bissau"],["GY","Guyana"],["HT","Haiti"],["HN","Honduras"],["HU","Hungary"],["IS","Iceland"],["IN","India"],["ID","Indonesia"],["IR","Iran"],["IQ","Iraq"],["IE","Ireland"],["IL","Israel"],["IT","Italy"],["JM","Jamaica"],["JP","Japan"],["JO","Jordan"],["KZ","Kazakhstan"],["KE","Kenya"],["KI","Kiribati"],["KP","North Korea"],["KR","South Korea"],["KW","Kuwait"],["KG","Kyrgyzstan"],["LA","Laos"],["LV","Latvia"],["LB","Lebanon"],["LS","Lesotho"],["LR","Liberia"],["LY","Libya"],["LI","Liechtenstein"],["LT","Lithuania"],["LU","Luxembourg"],["MG","Madagascar"],["MW","Malawi"],["MY","Malaysia"],["MV","Maldives"],["ML","Mali"],["MT","Malta"],["MH","Marshall Islands"],["MR","Mauritania"],["MU","Mauritius"],["MX","Mexico"],["FM","Micronesia"],["MD","Moldova"],["MC","Monaco"],["MN","Mongolia"],["ME","Montenegro"],["MA","Morocco"],["MZ","Mozambique"],["MM","Myanmar"],["NA","Namibia"],["NR","Nauru"],["NP","Nepal"],["NL","Netherlands"],["NZ","New Zealand"],["NI","Nicaragua"],["NE","Niger"],["NG","Nigeria"],["MK","North Macedonia"],["NO","Norway"],["OM","Oman"],["PK","Pakistan"],["PW","Palau"],["PS","Palestine"],["PA","Panama"],["PG","Papua New Guinea"],["PY","Paraguay"],["PE","Peru"],["PH","Philippines"],["PL","Poland"],["PT","Portugal"],["QA","Qatar"],["RO","Romania"],["RU","Russia"],["RW","Rwanda"],["KN","Saint Kitts and Nevis"],["LC","Saint Lucia"],["VC","Saint Vincent and the Grenadines"],["WS","Samoa"],["SM","San Marino"],["ST","Sao Tome and Principe"],["SA","Saudi Arabia"],["SN","Senegal"],["RS","Serbia"],["SC","Seychelles"],["SL","Sierra Leone"],["SG","Singapore"],["SK","Slovakia"],["SI","Slovenia"],["SB","Solomon Islands"],["SO","Somalia"],["ZA","South Africa"],["SS","South Sudan"],["ES","Spain"],["LK","Sri Lanka"],["SD","Sudan"],["SR","Suriname"],["SE","Sweden"],["CH","Switzerland"],["SY","Syria"],["TW","Taiwan"],["TJ","Tajikistan"],["TZ","Tanzania"],["TH","Thailand"],["TL","Timor-Leste"],["TG","Togo"],["TO","Tonga"],["TT","Trinidad and Tobago"],["TN","Tunisia"],["TR","Türkiye"],["TM","Turkmenistan"],["TV","Tuvalu"],["UG","Uganda"],["UA","Ukraine"],["AE","United Arab Emirates"],["GB","United Kingdom"],["US","United States"],["UY","Uruguay"],["UZ","Uzbekistan"],["VU","Vanuatu"],["VA","Vatican City"],["VE","Venezuela"],["VN","Vietnam"],["YE","Yemen"],["ZM","Zambia"],["ZW","Zimbabwe"]
   ];
 
+  for(const [code,name] of COUNTRIES){const option=document.createElement("option");option.value=code;option.textContent=name;country.appendChild(option)}
 
-  for (const [code, name] of COUNTRIES) {
-    const option = document.createElement("option");
-    option.value = code;
-    option.textContent = name;
-    country.appendChild(option);
-  }
-
-
-  function money(value) {
-    const n = Number(value);
-
-    return Number.isFinite(n)
-      ? "£" + n.toFixed(2)
-      : "—";
-  }
-
-
-  function numberOrNull(value) {
-    const n = Number(value);
-
-    return Number.isFinite(n)
-      ? n
-      : null;
-  }
-
-
-  /*
-    Accept the Worker shipping/tax object without assuming
-    a particular future shape. If the Worker supplies:
-      {low, high, status, label, basis}
-    we use it. If it supplies a number, we treat that as
-    an exact/known figure rather than inventing a range.
-  */
-
-  function normaliseRange(value) {
-
-    if (value == null) return null;
-
-    if (typeof value === "number") {
-      return {
-        low: value,
-        high: value,
-        status: "confirmed"
-      };
-    }
-
-    if (typeof value !== "object") return null;
-
-    const low = numberOrNull(value.low);
-    const high = numberOrNull(value.high);
-
-    if (low !== null && high !== null) {
-
-      return {
-        low: Math.min(low, high),
-        high: Math.max(low, high),
-        status: value.status || "indicative",
-        label: value.label || "",
-        basis: value.basis || ""
-      };
-
-    }
-
-    const amount = numberOrNull(value.amount);
-
-    if (amount !== null) {
-
-      return {
-        low: amount,
-        high: amount,
-        status: value.status || "confirmed",
-        label: value.label || "",
-        basis: value.basis || ""
-      };
-
-    }
-
+  function money(value){const n=Number(value);return Number.isFinite(n)?"£"+n.toFixed(2):"—"}
+  function numberOrNull(value){const n=Number(value);return Number.isFinite(n)?n:null}
+  function normaliseRange(value){
+    if(value==null)return null;
+    if(typeof value==="number")return {low:value,high:value,status:"confirmed"};
+    if(typeof value!=="object")return null;
+    const low=numberOrNull(value.low),high=numberOrNull(value.high);
+    if(low!==null&&high!==null)return {low:Math.min(low,high),high:Math.max(low,high),status:value.status||"indicative",label:value.label||"",basis:value.basis||""};
+    const amount=numberOrNull(value.amount);
+    if(amount!==null)return {low:amount,high:amount,status:value.status||"confirmed",label:value.label||"",basis:value.basis||""};
     return null;
   }
-
-
-  function rangeText(range, prefix = "") {
-
-    if (!range) return "Not available";
-
-    const suffix =
-      range.status === "confirmed"
-        ? ""
-        : "~";
-
-    if (Math.abs(range.high - range.low) < 0.005) {
-      return prefix + suffix + money(range.low);
-    }
-
-    return prefix + suffix + money(range.low) + "–" + money(range.high);
-  }
-
-
-  function setText(id, value) {
-
-    const el = document.getElementById(id);
-
-    if (el) {
-      el.textContent = value;
-    }
-
-  }
-
-
-  function setResultVisibility(show) {
-    result.classList.toggle("show", show);
-  }
-
-
-  function showEstimate(data, product, manualUkDelivery = null) {
-
-    const fee =
-      numberOrNull(data?.serviceFee?.amount) ??
-      numberOrNull(data?.serviceFee) ??
-      15;
-
-
-    const ukShipping =
-      normaliseRange(
-        manualUkDelivery !== null
-          ? {
-              amount: manualUkDelivery,
-              status: "confirmed"
-            }
-          : data?.ukShipping
-      );
-
-
-    const destinationShipping =
-      normaliseRange(data?.destinationShipping);
-
-
-    const importTax =
-      normaliseRange(data?.importTax);
-
-
-    /*
-      We calculate the amount payable to Get It, Send It
-      only from the components actually available.
-      No tax or shipping rate is invented here.
-    */
-
-    const ukLow =
-      ukShipping
-        ? ukShipping.low
-        : null;
-
-    const ukHigh =
-      ukShipping
-        ? ukShipping.high
-        : null;
-
-
-    const shipLow =
-      destinationShipping
-        ? destinationShipping.low
-        : null;
-
-
-    const shipHigh =
-      destinationShipping
-        ? destinationShipping.high
-        : null;
-
-
-    const baseLow =
-      product +
-      (ukLow ?? 0) +
-      fee +
-      (shipLow ?? 0);
-
-
-    const baseHigh =
-      product +
-      (ukHigh ?? 0) +
-      fee +
-      (shipHigh ?? 0);
-
-
-    const missingUkShipping =
-      !ukShipping;
-
-    const missingDestinationShipping =
-      !destinationShipping;
-
-
-    setText(
-      "productCost",
-      money(product)
-    );
-
-
-    setText(
-      "ukDelivery",
-      ukShipping
-        ? rangeText(ukShipping)
-        : "Estimate unavailable"
-    );
-
-
-    setText(
-      "serviceFee",
-      money(fee)
-    );
-
-
-    setText(
-      "intlShipping",
-      destinationShipping
-        ? rangeText(destinationShipping)
-        : "Estimate unavailable"
-    );
-
-
-    setText(
-      "importTax",
-      importTax
-        ? rangeText(importTax)
-        : "Not calculated"
-    );
-
-
-    setText(
-      "range",
-      missingUkShipping || missingDestinationShipping
-        ? "Estimate incomplete"
-        : money(baseLow) + "–" + money(baseHigh)
-    );
-
-
-    setText(
-      "rangeLabel",
-      missingUkShipping || missingDestinationShipping
-        ? "We don't have enough reliable shipping information to give you a complete total yet."
-        : "Estimated amount payable to Get It, Send It — before any recipient-paid import charges."
-    );
-
-
-    /*
-      Import tax is deliberately shown separately because
-      it may be collected by customs/carrier from the recipient.
-      If the Worker supplies an indicative figure, show a
-      separate possible all-in range rather than pretending
-      it is part of our invoice.
-    */
-
-    const allInRow =
-      document.getElementById("allInRow");
-
-
-    if (importTax) {
-
-      const allLow =
-        baseLow + importTax.low;
-
-      const allHigh =
-        baseHigh + importTax.high;
-
-
-      setText(
-        "allInRange",
-        money(allLow) + "–" + money(allHigh)
-      );
-
-
-      allInRow.style.display = "flex";
-
-    } else {
-
-      allInRow.style.display = "none";
-
-    }
-
-
-    const basisBits = [];
-
-
-    if (ukShipping?.status !== "confirmed") {
-      basisBits.push("UK delivery is indicative");
-    }
-
-
-    if (destinationShipping?.status !== "confirmed") {
-      basisBits.push("international delivery is indicative");
-    }
-
-
-    if (
-      data?.fx?.status &&
-      data.fx.status !== "confirmed"
-    ) {
-      basisBits.push("currency conversion is indicative");
-    }
-
-
-    const basisText =
-      basisBits.length
-        ? basisBits.join("; ") + "."
-        : "Shipping figures are based on confirmed charges supplied to the calculation engine.";
-
-
-    setText(
-      "shippingBasis",
-      basisText
-    );
-
-
-    const taxText =
-      importTax
-        ? (
-            (importTax.label ||
-              "Potential import charges are shown separately.") +
-            " They are indicative unless the actual customs/carrier charge is known."
-          )
-        : "Import VAT, customs duty and carrier/clearance charges could not be calculated reliably for this estimate and are not included.";
-
-
-    setText(
-      "taxCaveat",
-      taxText
-    );
-
-
+  function rangeText(range){if(!range)return "Not available";const suffix=range.status==="confirmed"?"":"~";return Math.abs(range.high-range.low)<.005?suffix+money(range.low):suffix+money(range.low)+"–"+money(range.high)}
+  function setText(id,value){const el=document.getElementById(id);if(el)el.textContent=value}
+  function setResultVisibility(show){result.classList.toggle("show",show)}
+
+  function showEstimate(data,product,manualUkDelivery=null){
+    const fee=numberOrNull(data?.serviceFee?.amount)??numberOrNull(data?.serviceFee)??15;
+    const ukShipping=normaliseRange(manualUkDelivery!==null?{amount:manualUkDelivery,status:"confirmed"}:data?.ukShipping);
+    const destinationShipping=normaliseRange(data?.destinationShipping);
+    const importTax=normaliseRange(data?.importTax);
+    const ukLow=ukShipping?.low??0,ukHigh=ukShipping?.high??0;
+    const shipLow=destinationShipping?.low??0,shipHigh=destinationShipping?.high??0;
+    const baseLow=product+ukLow+fee+shipLow,baseHigh=product+ukHigh+fee+shipHigh;
+    setText("productCost",money(product));
+    setText("ukDelivery",ukShipping?rangeText(ukShipping):"Not provided");
+    setText("serviceFee",money(fee));
+    setText("intlShipping",destinationShipping?rangeText(destinationShipping):"Estimate unavailable");
+    setText("importTax",importTax?rangeText(importTax):"Not calculated");
+    setText("range",money(baseLow)+"–"+money(baseHigh));
+    setText("rangeLabel","Estimated amount payable to Get It, Send It — before any recipient-paid import charges.");
+    const allInRow=document.getElementById("allInRow");
+    if(importTax){setText("allInRange",money(baseLow+importTax.low)+"–"+money(baseHigh+importTax.high));allInRow.style.display="flex"}else{allInRow.style.display="none"}
+    const basisBits=[];
+    if(ukShipping?.status!=="confirmed")basisBits.push("UK delivery is indicative or not yet confirmed");
+    if(destinationShipping?.status!=="confirmed")basisBits.push("international delivery is indicative");
+    setText("shippingBasis",basisBits.length?basisBits.join("; ")+".":"Shipping figures are based on charges supplied to the calculation engine.");
+    setText("taxCaveat",importTax?(importTax.basis||"Potential import charges are shown separately.")+" They are indicative unless the actual customs/carrier charge is known.":"We don't currently have a verified import-tax rule for this destination. That's okay — the estimate still calculates without it. Any tax or duty actually charged by customs/carrier would be additional.");
     setResultVisibility(true);
-
-
-    result.scrollIntoView({
-      behavior:"smooth",
-      block:"nearest"
-    });
-
+    result.scrollIntoView({behavior:"smooth",block:"nearest"});
   }
 
+  function showManual(productValue=""){manualFields.classList.add("show");manualProduct.value=productValue!==""?Number(productValue).toFixed(2):"";manualDelivery.value="";manualProduct.focus()}
 
-  function showManual(productValue = "") {
-
-    manualFields.classList.add("show");
-
-
-    manualProduct.value =
-      productValue !== ""
-        ? Number(productValue).toFixed(2)
-        : "";
-
-
-    manualDelivery.value = "";
-
-
-    manualProduct.focus();
-
+  async function runEstimate(){
+    const productUrl=url.value.trim(),destination=country.value;
+    if(!productUrl){url.focus();url.placeholder="Paste a product link first";return}
+    if(!destination){country.focus();return}
+    errorMessage.classList.remove("show");manualFields.classList.remove("show");setResultVisibility(false);waitingMessage.classList.add("show");
+    const originalButtonText=btn.textContent;btn.disabled=true;btn.textContent="CALCULATING…";
+    try{
+      const response=await fetch("/api/product?url="+encodeURIComponent(productUrl)+"&destination="+encodeURIComponent(destination));
+      let data;try{data=await response.json()}catch{throw new Error("The product lookup returned an invalid response.")}
+      if(!response.ok||!data.success||!data.product||typeof data.product.priceGbp!=="number"){
+        if(response.ok&&data.success&&data.product&&typeof data.product.price==="number"&&(!data.product.currency||data.product.currency==="GBP")){data.product.priceGbp=data.product.price}else{throw new Error(data.error||"We couldn't automatically find the product price.")}
+      }
+      manualFields.classList.remove("show");showEstimate(data,data.product.priceGbp);
+    }catch(error){errorMessage.textContent="We couldn't automatically retrieve the product price from this retailer. Enter the product price in GBP below. UK delivery is optional — leave it blank if you don't know it.";errorMessage.classList.add("show");showManual()}
+    finally{waitingMessage.classList.remove("show");btn.disabled=false;btn.textContent=originalButtonText}
   }
 
-
-  async function runEstimate() {
-
-    const productUrl =
-      url.value.trim();
-
-    const destination =
-      country.value;
-
-
-    if (!productUrl) {
-
-      url.focus();
-
-      url.placeholder =
-        "Paste a product link first";
-
-      return;
-    }
-
-
-    if (!destination) {
-
-      country.focus();
-
-      return;
-    }
-
-
-    errorMessage.classList.remove("show");
-
-    manualFields.classList.remove("show");
-
-    setResultVisibility(false);
-
-
-    const originalButtonText =
-      btn.textContent;
-
-
-    btn.disabled = true;
-
-    btn.textContent =
-      "CHECKING PRODUCT…";
-
-
-    try {
-
-      const response =
-        await fetch(
-          "/api/product?url=" +
-          encodeURIComponent(productUrl) +
-          "&destination=" +
-          encodeURIComponent(destination)
-        );
-
-
-      let data;
-
-
-      try {
-
-        data =
-          await response.json();
-
-      } catch {
-
-        throw new Error(
-          "The product lookup returned an invalid response."
-        );
-
-      }
-
-
-      if (
-        !response.ok ||
-        !data.success ||
-        !data.product ||
-        typeof data.product.priceGbp !== "number"
-      ) {
-
-        /*
-          Support the previous Worker response shape too.
-          This avoids breaking the page while the Worker evolves.
-        */
-
-        if (
-          response.ok &&
-          data.success &&
-          data.product &&
-          typeof data.product.price === "number" &&
-          (
-            !data.product.currency ||
-            data.product.currency === "GBP"
-          )
-        ) {
-
-          data.product.priceGbp =
-            data.product.price;
-
-        } else {
-
-          throw new Error(
-            data.error ||
-            "We couldn't automatically find the product price."
-          );
-
-        }
-
-      }
-
-
-      const product =
-        data.product.priceGbp;
-
-
-      manualFields.classList.remove("show");
-
-
-      showEstimate(
-        data,
-        product
-      );
-
-
-    } catch (error) {
-
-      /*
-        We don't pretend a failed retailer lookup is a failed
-        estimate. The user can enter the price manually.
-      */
-
-      errorMessage.textContent =
-        "We couldn't automatically retrieve the product price from this retailer. Enter the product price in GBP below. UK delivery is optional — leave it blank if you don't know it.";
-
-
-      errorMessage.classList.add("show");
-
-
-      showManual();
-
-    } finally {
-
-      btn.disabled = false;
-
-      btn.textContent =
-        originalButtonText;
-
-    }
-
+  async function runManualEstimate(){
+    const product=parseFloat(manualProduct.value),deliveryText=manualDelivery.value.trim(),destination=country.value;
+    if(Number.isNaN(product)||product<0){manualProduct.focus();return}
+    if(!destination){country.focus();return}
+    const ukDelivery=deliveryText===""?null:parseFloat(deliveryText);
+    if(ukDelivery!==null&&(Number.isNaN(ukDelivery)||ukDelivery<0)){manualDelivery.focus();return}
+    errorMessage.classList.remove("show");waitingMessage.classList.add("show");
+    const originalButtonText=manualBtn.textContent;manualBtn.disabled=true;manualBtn.textContent="CALCULATING…";
+    try{
+      const params=new URLSearchParams({price:product.toString(),currency:"GBP",destination});if(ukDelivery!==null)params.set("ukShipping",ukDelivery.toString());
+      const response=await fetch("/api/estimate?"+params.toString());let data;try{data=await response.json()}catch{throw new Error("The estimate service returned an invalid response.")}
+      if(!response.ok||!data.success)throw new Error(data.error||"We couldn't calculate the estimate.");
+      manualFields.classList.remove("show");showEstimate(data,data.product.priceGbp);
+    }catch(error){errorMessage.textContent=error.message||"We couldn't calculate the estimate. Please try again.";errorMessage.classList.add("show")}
+    finally{waitingMessage.classList.remove("show");manualBtn.disabled=false;manualBtn.textContent=originalButtonText}
   }
-
-
-  async function runManualEstimate() {
-
-    const product =
-      parseFloat(manualProduct.value);
-
-    const deliveryText =
-      manualDelivery.value.trim();
-
-    const destination =
-      country.value;
-
-
-    if (
-      Number.isNaN(product) ||
-      product < 0
-    ) {
-
-      manualProduct.focus();
-
-      return;
-
-    }
-
-
-    if (!destination) {
-
-      country.focus();
-
-      return;
-
-    }
-
-
-    const ukDelivery =
-      deliveryText === ""
-        ? null
-        : parseFloat(deliveryText);
-
-
-    if (
-      ukDelivery !== null &&
-      (
-        Number.isNaN(ukDelivery) ||
-        ukDelivery < 0
-      )
-    ) {
-
-      manualDelivery.focus();
-
-      return;
-
-    }
-
-
-    errorMessage.classList.remove("show");
-
-
-    const originalButtonText =
-      manualBtn.textContent;
-
-
-    manualBtn.disabled = true;
-
-    manualBtn.textContent =
-      "CALCULATING…";
-
-
-    try {
-
-      const params =
-        new URLSearchParams({
-          price: product.toString(),
-          currency: "GBP",
-          destination
-        });
-
-
-      if (ukDelivery !== null) {
-
-        params.set(
-          "ukShipping",
-          ukDelivery.toString()
-        );
-
-      }
-
-
-      const response =
-        await fetch(
-          "/api/estimate?" +
-          params.toString()
-        );
-
-
-      let data;
-
-
-      try {
-
-        data =
-          await response.json();
-
-      } catch {
-
-        throw new Error(
-          "The estimate service returned an invalid response."
-        );
-
-      }
-
-
-      if (
-        !response.ok ||
-        !data.success
-      ) {
-
-        throw new Error(
-          data.error ||
-          "We couldn't calculate the estimate."
-        );
-
-      }
-
-
-      manualFields.classList.remove("show");
-
-
-      showEstimate(
-        data,
-        data.product.priceGbp
-      );
-
-
-    } catch (error) {
-
-      errorMessage.textContent =
-        error.message ||
-        "We couldn't calculate the estimate. Please try again.";
-
-
-      errorMessage.classList.add("show");
-
-    } finally {
-
-      manualBtn.disabled = false;
-
-      manualBtn.textContent =
-        originalButtonText;
-
-    }
-
-  }
-
-
-  btn.addEventListener(
-    "click",
-    runEstimate
-  );
-
-
-  manualBtn.addEventListener(
-    "click",
-    runManualEstimate
-  );
-
+  btn.addEventListener("click",runEstimate);manualBtn.addEventListener("click",runManualEstimate);
 </script>
-
 </body>
 </html>
