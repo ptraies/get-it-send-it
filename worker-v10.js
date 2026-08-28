@@ -23,11 +23,10 @@ function newsMarkup() {
 function enhanceHomePage(response) {
   const contentType = response.headers.get("content-type") || "";
   if (!contentType.includes("text/html")) return response;
-
   return response.text().then(html => {
     const style = `<style>
       .hero-grid{align-items:start !important;grid-template-columns:1.05fr .95fr !important;gap:55px !important}
-      .hero-grid .visual{position:relative !important;min-height:0 !important;display:block !important;padding-top:0 !important}
+      .hero-grid .visual{position:relative !important;min-height:0 !important;display:block !important;padding-top:0 !important;align-items:initial !important;justify-content:initial !important}
       .hero-grid .visual>.blob,.hero-grid .visual>.note{display:none !important}
       .gis-tax-news{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:25px 24px;position:sticky;top:24px;color:var(--ink)}
       .gis-news-eyebrow{font-family:var(--serif);font-size:31px;line-height:1;color:var(--cobalt);letter-spacing:-1px;margin-bottom:18px}
@@ -49,12 +48,14 @@ function enhanceHomePage(response) {
       @media(max-width:820px){.hero-grid{grid-template-columns:1fr !important;gap:40px !important}.hero-grid .visual{order:2}.gis-tax-news{position:relative;top:auto;margin-top:8px}.gis-news-eyebrow{font-size:28px}}
     </style>`;
     let out = html.replace(/<\/head>/i, `${style}</head>`);
-    const replacement = newsMarkup();
-    const visualPattern = /<div class="visual"[\s\S]*?<\/div>\s*<\/div>\s*<\/section>/i;
-    if (visualPattern.test(out)) {
-      out = out.replace(visualPattern, `${replacement}</div></section>`);
-    } else {
-      out = out.replace(/<div class="visual"[\s\S]*?<\/section>/i, `${replacement}</div></section>`);
+    const marker = '<div class="visual"';
+    const start = out.indexOf(marker);
+    if (start !== -1) {
+      const openEnd = out.indexOf('>', start);
+      if (openEnd !== -1) {
+        const injected = `${out.slice(0, openEnd + 1)}${newsMarkup()}${out.slice(openEnd + 1)}`;
+        out = injected;
+      }
     }
     return new Response(out, { status: response.status, headers: new Headers(response.headers) });
   });
