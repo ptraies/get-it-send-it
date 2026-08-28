@@ -13,7 +13,7 @@ function jsonResponse(data, status = 200) {
   });
 }
 
-function getArticleCode(value) {
+function getHMArticleCode(value) {
   try {
     const url = new URL(value);
     if (!HM_HOSTS.has(url.hostname.toLowerCase())) return null;
@@ -41,6 +41,56 @@ function getAuthHeader(apiKey) {
   return `Basic ${btoa(binary)}`;
 }
 
+async function fetchShopifyProductFixed(productUrl) {
+  let url;
+  try {
+    url = new URL(productUrl);
+  } catch {
+    return null;
+  }
+
+  const match = url.pathname.match(/\/products\/([^/?#]+)/i);
+  if (!match) return null;
+
+  const handle = decodeURIComponent(match[1]);
+  const endpoint = `${url.origin}/products/${encodeURIComponent(handle)}.js`;
+
+  try {
+    const response = await fetch(endpoint, {
+      headers: {
+        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (compatible; GetItSendIt/1.5; +https://getitsendit.co.uk)"
+      },
+      redirect: "follow",
+      cache: "no-store"
+    });
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const variants = Array.isArray(data?.variants) ? data.variants : [];
+    const available = variants.find(v => v && v.available && v.price !== undefined);
+    const variant = available || variants.find(v => v?.price !== undefined);
+    const raw = data?.price ?? data?.price_min ?? variant?.price;
+    const numeric = cleanPrice(raw);
+    if (numeric === null || numeric <= 0) return null;
+
+    // Shopify Ajax Product API monetary fields are returned in the currency
+    // subunit (e.g. 799 means £7.99; 79900 means £799.00).
+    const price = numeric / 100;
+    if (!Number.isFinite(price) || price <= 0 || price >= 100000) return null;
+
+    return {
+      name: data?.title || null,
+      price,
+      currency: String(data?.currency || "GBP").toUpperCase(),
+      availability: data?.available === false ? "OutOfStock" : data?.available === true ? "InStock" : null,
+      source: "shopify_ajax_fixed"
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function zyteProduct(env, productUrl, extractFrom, options = {}) {
   if (!env?.ZYTE_API_KEY) return { ok: false, reason: "zyte_api_key_missing", extractFrom };
 
@@ -52,12 +102,8 @@ async function zyteProduct(env, productUrl, extractFrom, options = {}) {
       const body = {
         url: productUrl,
         product: true,
-        productOptions: {
-          extractFrom,
-          ai: true
-        }
+        productOptions: { extractFrom, ai: true }
       };
-
       if (extractFrom === "browserHtml") body.browserHtml = true;
       if (extractFrom === "httpResponseBody") body.httpResponseBody = true;
       if (options.geolocation) body.geolocation = options.geolocation;
@@ -75,7 +121,6 @@ async function zyteProduct(env, productUrl, extractFrom, options = {}) {
       const text = await response.text();
       let data = null;
       try { data = JSON.parse(text); } catch {}
-
       const product = data?.product || null;
       const price = cleanPrice(product?.price);
       const currency = String(product?.currency || "").toUpperCase();
@@ -108,23 +153,23 @@ async function zyteProduct(env, productUrl, extractFrom, options = {}) {
   return { ok: false, reason: "zyte_request_failed", extractFrom, attempts };
 }
 
-function zyteOptions(productUrl) {
-  try {
-    const url = new URL(productUrl);
-    if (HM_HOSTS.has(url.hostname.toLowerCase()) && url.pathname.toLowerCase().includes("/en_gb/")) {
-      return { retry520: true, geolocation: "GB" };
-    }
-  } catch {}
-  return { retry520: true };
-}
-
 async function getZyteProduct(env, productUrl) {
-  const options = zyteOptions(productUrl);
+  const isHmUk = (() => {
+    try {
+      const u = new URL(productUrl);
+      return HM_HOSTS.has(u.hostname.toLowerCase()) && u.pathname.toLowerCase().includes("/en_gb/");
+    } catch {
+      return false;
+    }
+  })();
 
   const http = await zyteProduct(env, productUrl, "httpResponseBody");
   if (http.ok) return { ...http, source: "zyte_http_product" };
 
-  const browser = await zyteProduct(env, productUrl, "browserHtml", options);
+  const browser = await zyteProduct(env, productUrl, "browserHtml", {
+    retry520: true,
+    ...(isHmUk ? { geolocation: "GB" } : {})
+  });
   if (browser.ok) return { ...browser, source: "zyte_browser_product" };
 
   return {
@@ -135,17 +180,63 @@ async function getZyteProduct(env, productUrl) {
   };
 }
 
-async function estimateFromBase(request, env, product) {
+function addPngImportTax(data, destination) {
+  if (destination !== "PG" || !data) return data;
+  const product = Number(data.product?.amount ?? data.product?.priceGbp);
+  const uk = data.ukShipping;
+  const dest = data.destinationShipping;
+  const ukAmount = uk?.status === "confirmed" && Number.isFinite(Number(uk.amount)) ? Number(uk.amount) : 0;
+  const lowShipping = Number(dest?.low);
+  const highShipping = Number(dest?.high);
+
+  if (!Number.isFinite(product) || !Number.isFinite(lowShipping) || !Number.isFinite(highShipping)) return data;
+
+  const customsLow = product + ukAmount + lowShipping;
+  const customsHigh = product + ukAmount + highShipping;
+  const lowTax = customsLow * 0.10;
+  const highTax = customsHigh * 0.10;
+
+  const previous = data.importTax || {};
+  const dutyUnknown = data.customsDuty?.status === "unknown";
+  const unresolved = Array.isArray(data.unresolved) ? data.unresolved.filter(x => x !== "Destination import taxes") : [];
+  if (dutyUnknown && !unresolved.includes("Customs duty")) unresolved.push("Customs duty");
+
+  const low = product + Number(data.serviceFee?.amount || 0) + ukAmount + lowShipping + lowTax;
+  const high = product + Number(data.serviceFee?.amount || 0) + ukAmount + highShipping + highTax;
+
+  return {
+    ...data,
+    importTax: {
+      status: "indicative",
+      low: lowTax,
+      high: highTax,
+      label: "Potential GST",
+      basis: "Indicative 10% PNG GST applied to the estimated customs-value range. This does not include potentially applicable duty, exemptions or carrier/clearance charges."
+    },
+    total: {
+      ...(data.total || {}),
+      status: unresolved.length === 0 ? "estimated" : "partial",
+      low,
+      high,
+      currency: "GBP"
+    },
+    unresolved
+  };
+}
+
+async function calculateEstimate(request, env, product) {
   const incoming = new URL(request.url);
+  const destination = (incoming.searchParams.get("destination") || "").toUpperCase().trim();
   const estimateUrl = new URL("https://internal.local/api/estimate");
   estimateUrl.searchParams.set("price", String(product.price));
   estimateUrl.searchParams.set("currency", product.currency || "GBP");
-  estimateUrl.searchParams.set("destination", incoming.searchParams.get("destination") || "");
+  estimateUrl.searchParams.set("destination", destination);
 
   try {
     const response = await baseWorker.fetch(new Request(estimateUrl.toString(), { method: "GET" }), env);
     const data = await response.json();
-    return data?.success ? data : null;
+    if (!data?.success) return null;
+    return addPngImportTax(data, destination);
   } catch {
     return null;
   }
@@ -158,9 +249,31 @@ async function handleProduct(request, env) {
 
   if (!productUrl || !destination) return baseWorker.fetch(request, env);
 
-  // Let the generic resolver handle straightforward stores first. This is
-  // worker-v2 and deliberately does not invoke the old H&M-specific browser
-  // lookup that was returning the misleading £3.99 result.
+  // Shopify Ajax uses subunit monetary values. Handle it explicitly so
+  // values such as 799 become £7.99 rather than £799.00.
+  const shopify = await fetchShopifyProductFixed(productUrl);
+  if (shopify) {
+    const estimate = await calculateEstimate(request, env, shopify);
+    if (estimate) {
+      return jsonResponse({
+        ...estimate,
+        success: true,
+        product: {
+          ...(estimate.product || {}),
+          name: shopify.name,
+          price: shopify.price,
+          currency: shopify.currency,
+          priceGbp: shopify.currency === "GBP" ? shopify.price : estimate.product?.priceGbp,
+          availability: shopify.availability
+        },
+        lookupMethod: shopify.source,
+        sourceUrl: productUrl
+      });
+    }
+  }
+
+  // Generic path: existing free resolver first, then Zyte only when it
+  // doesn't return a usable price. This remains retailer-agnostic.
   try {
     const native = await baseWorker.fetch(request, env);
     const nativeText = await native.clone().text();
@@ -176,7 +289,7 @@ async function handleProduct(request, env) {
   if (zyte.ok) {
     const currency = String(zyte.currency || "GBP").toUpperCase();
     const product = {
-      articleCode: getArticleCode(productUrl),
+      articleCode: getHMArticleCode(productUrl),
       name: zyte.product?.name || null,
       price: zyte.price,
       currency,
@@ -184,7 +297,7 @@ async function handleProduct(request, env) {
       source: zyte.source
     };
 
-    const estimate = await estimateFromBase(request, env, product);
+    const estimate = await calculateEstimate(request, env, product);
     if (estimate) {
       return jsonResponse({
         ...estimate,
@@ -220,9 +333,6 @@ async function handleProduct(request, env) {
     });
   }
 
-  // Keep the generic resolver's normal manual-price fallback rather than
-  // allowing an older retailer-specific extractor to supply a potentially
-  // incorrect price.
   return baseWorker.fetch(request, env);
 }
 
@@ -237,8 +347,15 @@ export default {
       return jsonResponse({ success: result.ok, zyteConfigured: Boolean(env?.ZYTE_API_KEY), result }, result.ok ? 200 : 502);
     }
 
-    if (url.pathname === "/api/product" && request.method === "GET") {
-      return handleProduct(request, env);
+    if (url.pathname === "/api/product" && request.method === "GET") return handleProduct(request, env);
+
+    if (url.pathname === "/api/estimate" && request.method === "GET") {
+      const destination = (url.searchParams.get("destination") || "").toUpperCase().trim();
+      const response = await baseWorker.fetch(request, env);
+      let data = null;
+      try { data = await response.clone().json(); } catch {}
+      if (data?.success) return jsonResponse(addPngImportTax(data, destination), response.status);
+      return response;
     }
 
     return baseWorker.fetch(request, env);
