@@ -16,6 +16,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Set Zyte API key
+        if: ${{ secrets.ZYTE_API_KEY != '' }}
+        env:
+          ZYTE_API_KEY: ${{ secrets.ZYTE_API_KEY }}
+        run: printf '%s' "$ZYTE_API_KEY" | npx wrangler@4 secret put ZYTE_API_KEY
+
       - name: Deploy Worker
         uses: cloudflare/wrangler-action@v4
         with:
