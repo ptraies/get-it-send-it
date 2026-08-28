@@ -16,15 +16,20 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Install Wrangler
+        run: npm install --no-save wrangler@4
 
       - name: Set Zyte API key
         if: ${{ secrets.ZYTE_API_KEY != '' }}
         env:
           ZYTE_API_KEY: ${{ secrets.ZYTE_API_KEY }}
-        run: printf '%s' "$ZYTE_API_KEY" | npx wrangler@4 secret put ZYTE_API_KEY
+        run: |
+          printf '%s' "$ZYTE_API_KEY" | npx --no-install wrangler secret put ZYTE_API_KEY --name get-it-send-it
 
       - name: Deploy Worker
         uses: cloudflare/wrangler-action@v4
