@@ -3,7 +3,7 @@ import baseWorker from "./worker-v2.js";
 const HM_HOSTS = new Set(["hm.com", "www.hm.com", "www2.hm.com"]);
 
 function jsonResponse(data, status = 200) {
-  return new Response(JSON.stringify(data), {
+  return new Response(JSON.stringify(data, null, 2), {
     status,
     headers: {
       "content-type": "application/json; charset=UTF-8",
@@ -33,10 +33,22 @@ function cleanPrice(value) {
   return Number.isFinite(n) ? n : null;
 }
 
-async function browserHMProduct(env, productUrl, articleCode) {
-  if (!env?.BROWSER?.quickAction) return null;
+async function browserHMProduct(env, productUrl, articleCode, diagnostics = false) {
+  const result = {
+    stage: "browser_start",
+    bindingPresent: Boolean(env?.BROWSER),
+    quickActionPresent: Boolean(env?.BROWSER?.quickAction),
+    url: productUrl,
+    articleCode
+  };
+
+  if (!env?.BROWSER?.quickAction) {
+    result.stage = "browser_binding_missing";
+    return diagnostics ? result : null;
+  }
 
   try {
+    result.stage = "browser_call_started";
     const response = await env.BROWSER.quickAction("json", {
       url: productUrl,
       prompt: `Extract the product currently shown on this H&M UK product page. The article code in the URL is ${articleCode}. Return the price for this exact product in GBP, not a price from another product, recommendation, promotion, shipping option, or navigation element. If the product is on sale, return the current selling price. Also return the product name and whether the exact product appears available.`,
@@ -56,21 +68,53 @@ async function browserHMProduct(env, productUrl, articleCode) {
       }
     });
 
-    const data = await response.clone().json();
-    const result = data?.result || data?.data || null;
-    const price = cleanPrice(result?.price);
-    if (price === null || price <= 0 || price >= 100000) return null;
+    result.stage = "browser_response_received";
+    result.httpStatus = response?.status ?? null;
+    result.contentType = response?.headers?.get("content-type") || null;
+    result.browserMsUsed = response?.headers?.get("X-Browser-Ms-Used") || null;
 
-    return {
-      name: result?.name || null,
-      price,
-      currency: String(result?.currency || "GBP").toUpperCase(),
-      availability: result?.availability || null,
-      articleCode,
-      source: "cloudflare_browser_json"
-    };
-  } catch {
-    return null;
+    const raw = await response.clone().text();
+    result.rawPreview = raw.slice(0, 2000);
+
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch (error) {
+      result.stage = "browser_non_json_response";
+      result.parseError = String(error?.message || error);
+      return diagnostics ? result : null;
+    }
+
+    result.responseKeys = Object.keys(data || {});
+    const extracted = data?.result || data?.data || null;
+    result.extracted = extracted;
+
+    const price = cleanPrice(extracted?.price);
+    result.normalisedPrice = price;
+
+    if (price === null || price <= 0 || price >= 100000) {
+      result.stage = "browser_invalid_price";
+      return diagnostics ? result : null;
+    }
+
+    result.stage = "browser_success";
+
+    return diagnostics
+      ? result
+      : {
+          name: extracted?.name || null,
+          price,
+          currency: String(extracted?.currency || "GBP").toUpperCase(),
+          availability: extracted?.availability || null,
+          articleCode,
+          source: "cloudflare_browser_json"
+        };
+  } catch (error) {
+    result.stage = "browser_exception";
+    result.errorName = error?.name || null;
+    result.errorMessage = String(error?.message || error);
+    result.errorStack = error?.stack ? String(error.stack).slice(0, 3000) : null;
+    return diagnostics ? result : null;
   }
 }
 
@@ -109,14 +153,28 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    if (url.pathname === "/api/debug-product" && request.method === "GET") {
+      const productUrl = url.searchParams.get("url");
+      const articleCode = productUrl ? getHMArticleCode(productUrl) : null;
+      const diagnostics = productUrl && articleCode
+        ? await browserHMProduct(env, productUrl, articleCode, true)
+        : {
+            stage: "invalid_input",
+            url: productUrl,
+            articleCode
+          };
+
+      return jsonResponse({
+        success: diagnostics?.stage === "browser_success",
+        diagnostics
+      }, diagnostics?.stage === "browser_success" ? 200 : 502);
+    }
+
     if (url.pathname === "/api/product" && request.method === "GET") {
       const productUrl = url.searchParams.get("url");
       const articleCode = productUrl ? getHMArticleCode(productUrl) : null;
 
       if (productUrl && articleCode) {
-        // H&M is a JavaScript-heavy site. Use Cloudflare's managed browser
-        // and structured extraction first; this is deliberately separate from
-        // the older HTML/API heuristics because those repeatedly failed.
         const product = await browserHMProduct(env, productUrl, articleCode);
         if (product) {
           const estimate = await calculateEstimate(request, env, product);
@@ -138,9 +196,6 @@ export default {
           });
         }
 
-        // Keep the previous H&M implementation as a fallback. If Browser Run
-        // is unavailable or H&M changes its rendered page, the site still has
-        // the older extraction paths to try.
         return baseWorker.fetch(request, env);
       }
     }
