@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "get-it-send-it",
-  "main": "worker-v4.js",
+  "main": "worker-v5.js",
   "compatibility_date": "2026-08-28",
   "browser": {
     "binding": "BROWSER"
