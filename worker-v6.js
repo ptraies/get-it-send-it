@@ -34,75 +34,86 @@ function cleanPrice(value) {
   return Number.isFinite(number) ? number : null;
 }
 
-async function fetchViaJina(productUrl, articleCode) {
-  const started = Date.now();
-  const readerUrl = `https://r.jina.ai/${productUrl}`;
+function getAuthHeader(apiKey) {
+  const bytes = new TextEncoder().encode(`${apiKey}:`);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return `Basic ${btoa(binary)}`;
+}
+
+async function zyteProduct(env, productUrl, extractFrom) {
+  if (!env?.ZYTE_API_KEY) {
+    return { ok: false, reason: "zyte_api_key_missing", extractFrom };
+  }
 
   try {
-    const response = await fetch(readerUrl, {
+    const response = await fetch("https://api.zyte.com/v1/extract", {
+      method: "POST",
       headers: {
-        "Accept": "text/plain, text/markdown, */*",
-        "User-Agent": "GetItSendIt/1.4"
+        "Authorization": getAuthHeader(env.ZYTE_API_KEY),
+        "Content-Type": "application/json",
+        "Accept": "application/json"
       },
-      redirect: "follow",
-      cache: "no-store"
+      body: JSON.stringify({
+        url: productUrl,
+        product: true,
+        productOptions: {
+          extractFrom
+        }
+      })
     });
 
     const text = await response.text();
-    const preview = text.slice(0, 12000);
-
-    // Jina Reader returns a clean rendering of the page. Prefer a price close
-    // to the exact H&M article number and reject unrelated prices.
-    const articlePos = preview.indexOf(articleCode);
-    const nearby = articlePos >= 0
-      ? preview.slice(Math.max(0, articlePos - 1800), Math.min(preview.length, articlePos + 1800))
-      : preview;
-
-    const pricePatterns = [
-      /(?:Price|Current price|Our price|Sale price)\s*[:\-]?\s*(?:£|GBP\s*)?([0-9]{1,6}(?:,[0-9]{3})?(?:\.[0-9]{2})?)/i,
-      /£\s*([0-9]{1,6}(?:,[0-9]{3})?(?:\.[0-9]{2})?)/,
-      /GBP\s*([0-9]{1,6}(?:,[0-9]{3})?(?:\.[0-9]{2})?)/i
-    ];
-
-    let price = null;
-    for (const pattern of pricePatterns) {
-      const match = nearby.match(pattern);
-      if (match) {
-        price = cleanPrice(match[1]);
-        if (price !== null && price > 0 && price < 100000) break;
-      }
-    }
-
-    const nameMatch = nearby.match(/^#\s+(.+)$/m) || nearby.match(/Art\. No\.?:?\s*`?${articleCode}`?/i);
-    let name = null;
-    if (nameMatch?.[1]) name = nameMatch[1].trim();
-
-    // Stronger validation: the returned content must mention this exact
-    // article code, otherwise a generic/search page is not accepted.
-    const exactArticleFound = text.includes(articleCode);
+    let data = null;
+    try { data = JSON.parse(text); } catch {}
+    const product = data?.product || null;
+    const price = cleanPrice(product?.price);
+    const currency = String(product?.currency || "").toUpperCase();
+    const probability = Number(product?.metadata?.probability ?? 0);
 
     return {
-      ok: response.ok && exactArticleFound && price !== null,
+      ok: response.ok && !!product && price !== null && price > 0 && currency,
       status: response.status,
-      ms: Date.now() - started,
-      readerUrl,
-      exactArticleFound,
+      extractFrom,
       price,
-      name,
-      preview: preview.slice(0, 5000)
+      currency,
+      probability,
+      product,
+      responsePreview: response.ok ? null : text.slice(0, 1500)
     };
   } catch (error) {
     return {
       ok: false,
-      status: null,
-      ms: Date.now() - started,
-      readerUrl,
+      reason: "zyte_request_failed",
+      extractFrom,
       error: String(error?.message || error)
     };
   }
 }
 
-async function estimateFromWorker(request, env, product) {
+async function getZyteProduct(env, productUrl) {
+  // Cheapest/fastest path first. Only pay for browser rendering when the
+  // ordinary HTTP response doesn't contain a usable product price.
+  const http = await zyteProduct(env, productUrl, "httpResponseBody");
+  if (http.ok && http.probability >= 0.5) return { ...http, source: "zyte_http_product" };
+
+  const browser = await zyteProduct(env, productUrl, "browserHtml");
+  if (browser.ok && browser.probability >= 0.5) return { ...browser, source: "zyte_browser_product" };
+
+  // Keep a usable extraction even when Zyte's probability is conservative,
+  // provided it returned a positive price.
+  if (http.ok) return { ...http, source: "zyte_http_product" };
+  if (browser.ok) return { ...browser, source: "zyte_browser_product" };
+
+  return {
+    ok: false,
+    reason: env?.ZYTE_API_KEY ? "zyte_no_product_price" : "zyte_api_key_missing",
+    http,
+    browser
+  };
+}
+
+async function estimateFromCurrentWorker(request, env, product) {
   const incoming = new URL(request.url);
   const estimateUrl = new URL("https://internal.local/api/estimate");
   estimateUrl.searchParams.set("price", String(product.price));
@@ -118,68 +129,96 @@ async function estimateFromWorker(request, env, product) {
   }
 }
 
+async function normaliseEstimate(request, env, product, sourceUrl) {
+  const estimate = await estimateFromCurrentWorker(request, env, product);
+  if (estimate) {
+    return {
+      ...estimate,
+      success: true,
+      product: {
+        ...(estimate.product || {}),
+        name: product.name || estimate.product?.name || null,
+        price: product.price,
+        currency: product.currency,
+        priceGbp: product.currency === "GBP" ? product.price : estimate.product?.priceGbp,
+        availability: product.availability || estimate.product?.availability || null
+      },
+      lookupMethod: product.source,
+      articleCode: product.articleCode || null,
+      sourceUrl
+    };
+  }
+
+  return {
+    success: true,
+    product: {
+      name: product.name || null,
+      price: product.price,
+      currency: product.currency,
+      priceGbp: product.currency === "GBP" ? product.price : null,
+      availability: product.availability || null
+    },
+    lookupMethod: product.source,
+    articleCode: product.articleCode || null,
+    sourceUrl,
+    serviceFee: { status: "confirmed", amount: 15 },
+    warning: "The product price was found automatically, but the full delivery estimate could not be calculated."
+  };
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    if (url.pathname === "/api/debug-hm-jina" && request.method === "GET") {
+    if (url.pathname === "/api/debug-zyte" && request.method === "GET") {
       const productUrl = url.searchParams.get("url");
-      const articleCode = productUrl ? getHMArticleCode(productUrl) : null;
-      if (!articleCode) return jsonResponse({ success: false, error: "Invalid H&M product URL." }, 400);
-      return jsonResponse({ success: true, articleCode, jina: await fetchViaJina(productUrl, articleCode) });
+      if (!productUrl) return jsonResponse({ success: false, error: "Missing product URL." }, 400);
+
+      const result = await getZyteProduct(env, productUrl);
+      return jsonResponse({
+        success: result.ok,
+        zyteConfigured: Boolean(env?.ZYTE_API_KEY),
+        result
+      }, result.ok ? 200 : 502);
     }
 
     if (url.pathname === "/api/product" && request.method === "GET") {
       const productUrl = url.searchParams.get("url");
-      const articleCode = productUrl ? getHMArticleCode(productUrl) : null;
-      const destination = (url.searchParams.get("destination") || "").trim();
+      const destination = (url.searchParams.get("destination") || "").toUpperCase().trim();
 
-      if (productUrl && articleCode && destination) {
-        const jina = await fetchViaJina(productUrl, articleCode);
-        if (jina.ok) {
-          const product = {
-            articleCode,
-            name: jina.name,
-            price: jina.price,
-            currency: "GBP",
-            source: "jina_reader_hm"
-          };
-
-          const estimate = await estimateFromWorker(request, env, product);
-          if (estimate) {
-            return jsonResponse({
-              ...estimate,
-              success: true,
-              product: {
-                ...(estimate.product || {}),
-                name: product.name || estimate.product?.name || null,
-                price: product.price,
-                currency: "GBP",
-                priceGbp: product.price,
-                availability: estimate.product?.availability || null
-              },
-              lookupMethod: product.source,
-              articleCode,
-              sourceUrl: productUrl
+      if (productUrl && destination) {
+        // First let the existing/native resolver have a go. This keeps easy
+        // retailers free and preserves all current estimate logic.
+        try {
+          const nativeResponse = await currentWorker.fetch(request, env);
+          const nativeText = await nativeResponse.clone().text();
+          let nativeData = null;
+          try { nativeData = JSON.parse(nativeText); } catch {}
+          const nativePrice = cleanPrice(nativeData?.product?.priceGbp);
+          if (nativeData?.success && nativePrice !== null && nativePrice > 0) {
+            return new Response(nativeText, {
+              status: nativeResponse.status,
+              headers: nativeResponse.headers
             });
           }
+        } catch {}
 
-          return jsonResponse({
-            success: true,
-            product: {
-              name: product.name,
-              price: product.price,
-              currency: "GBP",
-              priceGbp: product.price,
-              availability: null
-            },
-            lookupMethod: product.source,
-            articleCode,
-            sourceUrl: productUrl,
-            warning: "The H&M price was found automatically, but the rest of the estimate could not be calculated."
-          });
+        const zyte = await getZyteProduct(env, productUrl);
+        if (zyte.ok) {
+          const currency = String(zyte.currency || "GBP").toUpperCase();
+          const product = {
+            articleCode: getHMArticleCode(productUrl),
+            name: zyte.product?.name || null,
+            price: zyte.price,
+            currency,
+            availability: zyte.product?.availability || null,
+            source: zyte.source
+          };
+          return jsonResponse(await normaliseEstimate(request, env, product, productUrl));
         }
       }
+
+      return currentWorker.fetch(request, env);
     }
 
     return currentWorker.fetch(request, env);
