@@ -34,6 +34,39 @@ function cleanPrice(value) {
   return Number.isFinite(number) ? number : null;
 }
 
+function detectVatStatus(text) {
+  const value = String(text || "");
+  if (/(?:including|inclusive of|incl\.?|inc\.?)[\s-]*(?:UK\s*)?VAT\b|\bVAT\s+(?:included|inclusive)\b/i.test(value)) {
+    return {
+      status: "included",
+      basis: "The retailer explicitly indicates that the displayed price includes VAT."
+    };
+  }
+  if (/(?:excluding|exclusive of|ex\.?|exc\.?)[\s-]*(?:UK\s*)?VAT\b|\bVAT\s+(?:excluded|exclusive)\b|\bplus\s+VAT\b/i.test(value)) {
+    return {
+      status: "excluded",
+      basis: "The retailer explicitly indicates that VAT is excluded from the displayed price."
+    };
+  }
+  return {
+    status: "unknown",
+    basis: "The retailer data did not clearly state whether the displayed price includes VAT."
+  };
+}
+
+function normaliseVatStatus(value, fallbackText = "") {
+  if (typeof value === "boolean") {
+    return value
+      ? { status: "included", basis: "The retailer data explicitly says tax is included." }
+      : { status: "excluded", basis: "The retailer data explicitly says tax is not included." };
+  }
+  if (typeof value === "string") {
+    if (/included|inclusive/i.test(value)) return { status: "included", basis: "The retailer data indicates VAT/tax is included." };
+    if (/excluded|exclusive|plus/i.test(value)) return { status: "excluded", basis: "The retailer data indicates VAT/tax is excluded." };
+  }
+  return detectVatStatus(fallbackText);
+}
+
 function getAuthHeader(apiKey) {
   const bytes = new TextEncoder().encode(`${apiKey}:`);
   let binary = "";
@@ -79,11 +112,17 @@ async function fetchShopifyProductFixed(productUrl) {
     const price = numeric / 100;
     if (!Number.isFinite(price) || price <= 0 || price >= 100000) return null;
 
+    const vatStatus = normaliseVatStatus(
+      data?.taxes_included,
+      `${data?.title || ""} ${data?.description || ""}`
+    );
+
     return {
       name: data?.title || null,
       price,
       currency: String(data?.currency || "GBP").toUpperCase(),
       availability: data?.available === false ? "OutOfStock" : data?.available === true ? "InStock" : null,
+      vatStatus,
       source: "shopify_ajax_fixed"
     };
   } catch {
@@ -125,6 +164,10 @@ async function zyteProduct(env, productUrl, extractFrom, options = {}) {
       const price = cleanPrice(product?.price);
       const currency = String(product?.currency || "").toUpperCase();
       const probability = Number(product?.metadata?.probability ?? 0);
+      const vatStatus = normaliseVatStatus(
+        product?.taxesIncluded ?? product?.vatIncluded ?? product?.vatStatus,
+        product?.name || ""
+      );
 
       attempts.push({ attempt, status: response.status, price, currency, probability, ok: response.ok });
 
@@ -136,6 +179,7 @@ async function zyteProduct(env, productUrl, extractFrom, options = {}) {
         currency,
         probability,
         product,
+        vatStatus,
         attempts,
         responsePreview: response.ok ? null : text.slice(0, 1500)
       };
@@ -196,10 +240,8 @@ function addPngImportTax(data, destination) {
   const lowTax = customsLow * 0.10;
   const highTax = customsHigh * 0.10;
 
-  const previous = data.importTax || {};
-  const dutyUnknown = data.customsDuty?.status === "unknown";
   const unresolved = Array.isArray(data.unresolved) ? data.unresolved.filter(x => x !== "Destination import taxes") : [];
-  if (dutyUnknown && !unresolved.includes("Customs duty")) unresolved.push("Customs duty");
+  if (data.customsDuty?.status === "unknown" && !unresolved.includes("Customs duty")) unresolved.push("Customs duty");
 
   const low = product + Number(data.serviceFee?.amount || 0) + ukAmount + lowShipping + lowTax;
   const high = product + Number(data.serviceFee?.amount || 0) + ukAmount + highShipping + highTax;
@@ -249,8 +291,6 @@ async function handleProduct(request, env) {
 
   if (!productUrl || !destination) return baseWorker.fetch(request, env);
 
-  // Shopify Ajax uses subunit monetary values. Handle it explicitly so
-  // values such as 799 become £7.99 rather than £799.00.
   const shopify = await fetchShopifyProductFixed(productUrl);
   if (shopify) {
     const estimate = await calculateEstimate(request, env, shopify);
@@ -266,14 +306,13 @@ async function handleProduct(request, env) {
           priceGbp: shopify.currency === "GBP" ? shopify.price : estimate.product?.priceGbp,
           availability: shopify.availability
         },
+        vatStatus: shopify.vatStatus,
         lookupMethod: shopify.source,
         sourceUrl: productUrl
       });
     }
   }
 
-  // Generic path: existing free resolver first, then Zyte only when it
-  // doesn't return a usable price. This remains retailer-agnostic.
   try {
     const native = await baseWorker.fetch(request, env);
     const nativeText = await native.clone().text();
@@ -294,6 +333,7 @@ async function handleProduct(request, env) {
       price: zyte.price,
       currency,
       availability: zyte.product?.availability || null,
+      vatStatus: zyte.vatStatus,
       source: zyte.source
     };
 
@@ -310,6 +350,7 @@ async function handleProduct(request, env) {
           priceGbp: product.currency === "GBP" ? product.price : estimate.product?.priceGbp,
           availability: product.availability || estimate.product?.availability || null
         },
+        vatStatus: product.vatStatus,
         lookupMethod: product.source,
         articleCode: product.articleCode,
         sourceUrl: productUrl
@@ -325,6 +366,7 @@ async function handleProduct(request, env) {
         priceGbp: product.currency === "GBP" ? product.price : null,
         availability: product.availability
       },
+      vatStatus: product.vatStatus,
       lookupMethod: product.source,
       articleCode: product.articleCode,
       sourceUrl: productUrl,
@@ -334,6 +376,87 @@ async function handleProduct(request, env) {
   }
 
   return baseWorker.fetch(request, env);
+}
+
+function enhanceHomePage(response) {
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.includes("text/html")) return response;
+
+  return new HTMLRewriter()
+    .on("head", {
+      element(element) {
+        element.append(`<style>
+          #gis-loading-message {
+            display:none;
+            margin-top:18px;
+            padding:18px 20px;
+            border-radius:14px;
+            background:#fff7f1;
+            border:1px solid #f6c9af;
+            color:#8d3f1b;
+            font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+          }
+          #gis-loading-message.show { display:flex; align-items:center; gap:12px; }
+          #gis-loading-message strong { font-size:16px; font-weight:800; }
+          #gis-loading-dot { width:10px; height:10px; min-width:10px; border-radius:50%; background:#F36A21; animation:gisPulse 1s ease-in-out infinite; }
+          @keyframes gisPulse { 0%,100% { transform:scale(.8); opacity:.45; } 50% { transform:scale(1.15); opacity:1; } }
+        </style>`, { html:true });
+      }
+    })
+    .on("body", {
+      element(element) {
+        element.append(`<script>
+          (() => {
+            const run = () => {
+              const result = document.getElementById('result');
+              const button = document.getElementById('estimateBtn');
+              if (!button || !result) return;
+              let box = document.getElementById('gis-loading-message');
+              if (!box) {
+                box = document.createElement('div');
+                box.id = 'gis-loading-message';
+                box.innerHTML = '<span id="gis-loading-dot"></span><strong>We\'re calculating how much it\'ll cost to get this to you!</strong>';
+                button.insertAdjacentElement('afterend', box);
+              }
+              const originalFetch = window.fetch;
+              if (window.__gisFetchWrapped) return;
+              window.__gisFetchWrapped = true;
+              window.fetch = async (...args) => {
+                const first = String(args[0] || '');
+                const isEstimate = first.includes('/api/product');
+                if (isEstimate) {
+                  box.classList.add('show');
+                  result.classList.remove('show');
+                }
+                try {
+                  const response = await originalFetch(...args);
+                  return response;
+                } finally {
+                  if (isEstimate) box.classList.remove('show');
+                }
+              };
+              const relabel = () => {
+                const rangeLabel = document.getElementById('rangeLabel');
+                const allRow = document.getElementById('allInRow');
+                const allLabel = allRow ? allRow.querySelector('span') : null;
+                const importLabel = document.querySelector('#importTax')?.parentElement?.querySelector('span');
+                if (rangeLabel && !rangeLabel.dataset.gisRelabelled) {
+                  rangeLabel.textContent = 'Amount payable to Get It, Send It — before local taxes or import charges.';
+                  rangeLabel.dataset.gisRelabelled = '1';
+                }
+                if (importLabel) importLabel.textContent = 'Estimated local taxes & import charges';
+                if (allLabel) allLabel.textContent = 'Potential total including local taxes';
+              };
+              const observer = new MutationObserver(relabel);
+              observer.observe(document.body, { childList:true, subtree:true, characterData:true });
+              relabel();
+            };
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run); else run();
+          })();
+        </script>`, { html:true });
+      }
+    })
+    .transform(response);
 }
 
 export default {
@@ -358,6 +481,8 @@ export default {
       return response;
     }
 
-    return baseWorker.fetch(request, env);
+    const response = await baseWorker.fetch(request, env);
+    if (url.pathname === "/" || url.pathname === "/index.html") return enhanceHomePage(response);
+    return response;
   }
 };
