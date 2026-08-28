@@ -172,8 +172,10 @@ async function probeHM(url, articleCode) {
 
 async function hmApiDiagnostics(articleCode) {
   const code = String(articleCode || "");
+  const baseProductCode = code.slice(0, 7);
   const candidates = [
-    `https://www2.hm.com/hmwebservices/service/product/gb/availability/${code.slice(0, 7)}.json`,
+    `https://www2.hm.com/hmwebservices/service/product/gb/availability/${baseProductCode}.json`,
+    `https://tags.tiqcdn.com/dle/hm/hdl/${code}.json`,
     `https://api.hm.com/search-services/v1/en_gb/listing/resultpage?query=${encodeURIComponent(code)}&page=1&pageSize=72`,
     `https://api.hm.com/search-services/v1/en_gb/listing/resultpage?q=${encodeURIComponent(code)}&page=1&pageSize=72`,
     `https://api.hm.com/search-services/v1/en_gb/listing/resultpage?searchTerm=${encodeURIComponent(code)}&page=1&pageSize=72`
