@@ -1,6 +1,6 @@
 const ALLOWED_PROTOCOLS = new Set(["http:", "https:"]);
 
-const RULES_VERSION = "2026-08-27.2";
+const RULES_VERSION = "2026-08-28.1";
 const SERVICE_FEE_GBP = 15;
 
 function jsonResponse(data, status = 200) {
@@ -618,7 +618,7 @@ const COUNTRY_REGION = {
   GY: "southAmerica", PY: "southAmerica", PE: "southAmerica",
   SR: "southAmerica", UY: "southAmerica", VE: "southAmerica",
 
-  BH: "middleEast", CY: "middleEast", IQ: "middleEast",
+  BH: "middleEast", IQ: "middleEast",
   IL: "middleEast", JO: "middleEast", KW: "middleEast",
   LB: "middleEast", OM: "middleEast", PS: "middleEast",
   QA: "middleEast", SA: "middleEast", SY: "middleEast",
@@ -716,6 +716,15 @@ const IMPORT_TAX_RULES = {
     label: "GST",
     basis:
       "Indicative 15% GST calculation. Customs valuation, duty, levies, exemptions and collection arrangements can change the actual amount."
+  },
+
+  PG: {
+    name: "Papua New Guinea",
+    mode: "indicative",
+    rate: 0.10,
+    label: "GST",
+    basis:
+      "Indicative 10% GST calculation. PNG applies GST at 10% to most goods and to most imported goods, but exemptions, duty, valuation and clearance arrangements can change the actual amount."
   },
 
   DE: {
@@ -908,8 +917,8 @@ function indicativeImportTax(
   ) {
     return unknownImportTax(
       !rule
-        ? "We do not currently have a verified indicative VAT/GST profile for this destination."
-        : "We do not have enough information to establish the customs-value range."
+        ? "We do not currently have a verified indicative VAT/GST profile for this destination. The estimate can still be calculated; import tax is simply excluded until a verified rate/rule is available."
+        : "We do not have enough information to establish the customs-value range. The estimate can still be calculated without an import-tax figure."
     );
   }
 
@@ -1035,7 +1044,8 @@ function getCountryName(country) {
     GR: "Greece",
     HU: "Hungary",
     RO: "Romania",
-    HR: "Croatia"
+    HR: "Croatia",
+    PG: "Papua New Guinea"
   };
 
   return names[country] || country;
@@ -1123,15 +1133,8 @@ function calculateEstimate({
     );
   }
 
-  if (importTax.status === "unknown") {
-    unresolved.push(
-      "Destination import taxes"
-    );
-  }
-
-  unresolved.push(
-    "Customs duty"
-  );
+  // Import tax and customs duty are recipient-side/indicative costs.
+  // They must never block the core Get It, Send It estimate.
 
   return {
     product: {
