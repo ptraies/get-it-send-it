@@ -1,5 +1,6 @@
 import currentWorker from "./worker-v7.js";
 
+// Deployment trigger: keep live entry point in sync with the latest UI layer.
 function enhanceHomePage(response) {
   const contentType = response.headers.get("content-type") || "";
   if (!contentType.includes("text/html")) return response;
