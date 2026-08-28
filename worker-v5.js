@@ -34,6 +34,57 @@ function cleanPrice(value) {
   return Number.isFinite(number) ? number : null;
 }
 
+async function probeHMDetail(url) {
+  const started = Date.now();
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "Accept": "application/json, text/plain, */*",
+        "User-Agent": "Mozilla/5.0 (compatible; GetItSendIt/1.4; +https://getitsendit.co.uk)",
+        "Referer": "https://www2.hm.com/en_gb/"
+      },
+      redirect: "follow",
+      cache: "no-store"
+    });
+    const text = await response.text();
+    let data = null;
+    try { data = JSON.parse(text); } catch {}
+
+    let price = null;
+    let product = null;
+    if (data && typeof data === "object") {
+      const seen = new Set();
+      const walk = (value) => {
+        if (price !== null || value == null || typeof value !== "object" || seen.has(value)) return;
+        seen.add(value);
+        if (Array.isArray(value)) { for (const item of value) walk(item); return; }
+        for (const [key, valuePart] of Object.entries(value)) {
+          if (price === null && /(^price$|sellingPrice|currentPrice|whitePrice|listPrice|formattedPrice)/i.test(key)) {
+            const candidate = cleanPrice(valuePart);
+            if (candidate !== null && candidate > 0 && candidate < 100000) price = candidate;
+          }
+        }
+        if (!product && /product|article|name|title/i.test(Object.keys(value).join(" "))) product = value;
+        for (const child of Object.values(value)) walk(child);
+      };
+      walk(data);
+    }
+
+    return {
+      url,
+      status: response.status,
+      contentType: response.headers.get("content-type"),
+      finalUrl: response.url,
+      ms: Date.now() - started,
+      price,
+      preview: text.slice(0, 2500),
+      topLevelKeys: data && typeof data === "object" ? Object.keys(data).slice(0, 30) : []
+    };
+  } catch (error) {
+    return { url, status: null, ms: Date.now() - started, error: String(error?.message || error) };
+  }
+}
+
 async function searchHMWithBrowser(env, articleCode) {
   const searchUrl = `https://www2.hm.com/en_gb/search-results.html?q=${encodeURIComponent(articleCode)}`;
   if (!env?.BROWSER?.quickAction) return { ok: false, reason: "browser_binding_missing" };
@@ -113,6 +164,24 @@ async function estimateFromCurrentWorker(request, product) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    if (url.pathname === "/api/debug-hm-detail" && request.method === "GET") {
+      const productUrl = url.searchParams.get("url");
+      const articleCode = productUrl ? getHMArticleCode(productUrl) : null;
+      if (!articleCode) return jsonResponse({ success: false, error: "Invalid H&M product URL." }, 400);
+      const base = articleCode.slice(0, 7);
+      const candidates = [
+        `https://api.hm.com/product-services/v1/en_gb/articles/${articleCode}`,
+        `https://api.hm.com/product-services/v1/en_gb/products/${articleCode}`,
+        `https://api.hm.com/product-service/v1/en_gb/articles/${articleCode}`,
+        `https://api.hm.com/product-service/v1/en_gb/products/${articleCode}`,
+        `https://api.hm.com/products/v1/en_gb/articles/${articleCode}`,
+        `https://api.hm.com/articles/v1/en_gb/${articleCode}`,
+        `https://www2.hm.com/hmwebservices/service/product/gb/availability/${base}.json`,
+        `https://tags.tiqcdn.com/dle/hm/hdl/${articleCode}.json`
+      ];
+      return jsonResponse({ success: true, articleCode, probes: await Promise.all(candidates.map(probeHMDetail)) });
+    }
 
     if (url.pathname === "/api/debug-hm-search" && request.method === "GET") {
       const productUrl = url.searchParams.get("url");
