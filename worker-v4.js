@@ -118,6 +118,69 @@ async function browserHMProduct(env, productUrl, articleCode, diagnostics = fals
   }
 }
 
+async function probeHM(url, articleCode) {
+  const started = Date.now();
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "Accept": "application/json, text/plain, */*",
+        "User-Agent": "Mozilla/5.0 (compatible; GetItSendIt/1.4; +https://getitsendit.co.uk)",
+        "Referer": "https://www2.hm.com/en_gb/"
+      },
+      redirect: "follow",
+      cache: "no-store"
+    });
+    const text = await response.text();
+    let json = null;
+    try { json = JSON.parse(text); } catch {}
+
+    let productHit = null;
+    const seen = new Set();
+    const walk = (value) => {
+      if (productHit || value == null || typeof value !== "object" || seen.has(value)) return;
+      seen.add(value);
+      if (Array.isArray(value)) { for (const item of value) walk(item); return; }
+      const hasArticle = Object.entries(value).some(([k, v]) => /article(code|_code|id)?|product(code|_code|id)?|sku/i.test(k) && String(v) === String(articleCode));
+      if (hasArticle) {
+        for (const [k, v] of Object.entries(value)) {
+          if (/price|sellingPrice|currentPrice|listPrice|formattedPrice/i.test(k)) {
+            const price = cleanPrice(v);
+            if (price !== null && price > 0 && price < 100000) {
+              productHit = { matchedKey: k, price, name: value.name || value.title || value.productName || null, currency: value.currency || value.priceCurrency || value.currencyCode || "GBP" };
+              break;
+            }
+          }
+        }
+      }
+      for (const child of Object.values(value)) walk(child);
+    };
+    if (json) walk(json);
+
+    return {
+      url,
+      status: response.status,
+      contentType: response.headers.get("content-type"),
+      finalUrl: response.url,
+      ms: Date.now() - started,
+      productHit,
+      preview: text.slice(0, 1800)
+    };
+  } catch (error) {
+    return { url, status: null, ms: Date.now() - started, error: String(error?.message || error) };
+  }
+}
+
+async function hmApiDiagnostics(articleCode) {
+  const code = String(articleCode || "");
+  const candidates = [
+    `https://www2.hm.com/hmwebservices/service/product/gb/availability/${code.slice(0, 7)}.json`,
+    `https://api.hm.com/search-services/v1/en_gb/listing/resultpage?query=${encodeURIComponent(code)}&page=1&pageSize=72`,
+    `https://api.hm.com/search-services/v1/en_gb/listing/resultpage?q=${encodeURIComponent(code)}&page=1&pageSize=72`,
+    `https://api.hm.com/search-services/v1/en_gb/listing/resultpage?searchTerm=${encodeURIComponent(code)}&page=1&pageSize=72`
+  ];
+  return Promise.all(candidates.map(url => probeHM(url, code)));
+}
+
 async function calculateEstimate(request, env, product) {
   const incoming = new URL(request.url);
   const estimateUrl = new URL("https://internal.local/api/estimate");
@@ -153,16 +216,19 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    if (url.pathname === "/api/debug-hm-api" && request.method === "GET") {
+      const productUrl = url.searchParams.get("url");
+      const articleCode = productUrl ? getHMArticleCode(productUrl) : null;
+      if (!articleCode) return jsonResponse({ success: false, error: "Invalid H&M product URL." }, 400);
+      return jsonResponse({ success: true, articleCode, probes: await hmApiDiagnostics(articleCode) });
+    }
+
     if (url.pathname === "/api/debug-product" && request.method === "GET") {
       const productUrl = url.searchParams.get("url");
       const articleCode = productUrl ? getHMArticleCode(productUrl) : null;
       const diagnostics = productUrl && articleCode
         ? await browserHMProduct(env, productUrl, articleCode, true)
-        : {
-            stage: "invalid_input",
-            url: productUrl,
-            articleCode
-          };
+        : { stage: "invalid_input", url: productUrl, articleCode };
 
       return jsonResponse({
         success: diagnostics?.stage === "browser_success",
