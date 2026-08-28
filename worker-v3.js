@@ -156,6 +156,63 @@ function extractHMNextDataProduct(html, articleCode) {
   }
 }
 
+async function fetchHMSearchPage(articleCode) {
+  const searchUrl = `https://www2.hm.com/en_gb/search-results.html?q=${encodeURIComponent(articleCode)}`;
+
+  try {
+    const response = await fetch(searchUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-GB,en;q=0.9",
+        "Referer": "https://www2.hm.com/en_gb/index.html",
+        "Upgrade-Insecure-Requests": "1"
+      },
+      redirect: "follow",
+      cache: "no-store"
+    });
+
+    if (!response.ok) return null;
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.includes("html")) return null;
+    const html = await response.text();
+    const match = html.match(/<script[^>]+id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
+    if (!match) return null;
+
+    const data = JSON.parse(match[1].trim());
+    const hits = Array.isArray(data?.props?.pageProps?.srpProps?.hits)
+      ? data.props.pageProps.srpProps.hits
+      : [];
+
+    const product = hits.find((item) => {
+      const code = String(item?.articleCode ?? item?.article_code ?? item?.id ?? item?.productId ?? "");
+      const pdp = String(item?.pdpUrl ?? item?.productUrl ?? item?.product_url ?? item?.url ?? "");
+      return code === articleCode || pdp.includes(`productpage.${articleCode}.html`);
+    });
+
+    if (!product) return null;
+
+    const price = extractHMPrice(product) ??
+      cleanPrice(product?.regularPrice) ??
+      cleanPrice(product?.discountedPrice) ??
+      cleanPrice(product?.salePrice) ??
+      collectHMPriceCandidates(product, []).find((value) => value > 0) ??
+      null;
+
+    if (price === null) return null;
+
+    return {
+      name: product.productName || product.name || product.title || null,
+      price,
+      currency: "GBP",
+      availability: product?.availability?.stockState || null,
+      articleCode
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function fetchHMPage(productUrl, articleCode) {
   try {
     const response = await fetch(productUrl, {
@@ -234,6 +291,12 @@ async function findHMProduct(productUrl) {
       }
     } catch {}
   }
+
+  // The HTML search page is a useful middle ground: H&M has historically
+  // embedded the search hits (including price) in __NEXT_DATA__, even when
+  // the older JSON search endpoint changes shape.
+  const searchPageProduct = await fetchHMSearchPage(articleCode);
+  if (searchPageProduct) return searchPageProduct;
 
   return fetchHMPage(productUrl, articleCode);
 }
