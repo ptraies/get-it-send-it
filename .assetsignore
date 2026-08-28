@@ -3,3 +3,4 @@
 worker.js
 worker-v2.js
 wrangler.jsonc
+node_modules/
