@@ -15,10 +15,12 @@ function enhanceHomePage(response) {
             border:1px solid #f4c7aa;
             border-radius:14px;
             background:#fff7f1;
-            color:#8f421d;
-            font-size:16px;
-            font-weight:800;
-            line-height:1.4;
+            color:#173B8F;
+            font-family:Georgia,"Times New Roman",serif !important;
+            font-size:18px !important;
+            font-weight:700 !important;
+            letter-spacing:-.15px;
+            line-height:1.35;
             text-align:center;
             box-shadow:0 8px 24px rgba(243,106,33,.08);
           }
