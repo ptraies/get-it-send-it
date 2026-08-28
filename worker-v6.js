@@ -41,67 +41,114 @@ function getAuthHeader(apiKey) {
   return `Basic ${btoa(binary)}`;
 }
 
-async function zyteProduct(env, productUrl, extractFrom) {
+async function zyteProduct(env, productUrl, extractFrom, options = {}) {
   if (!env?.ZYTE_API_KEY) {
     return { ok: false, reason: "zyte_api_key_missing", extractFrom };
   }
 
-  try {
-    const response = await fetch("https://api.zyte.com/v1/extract", {
-      method: "POST",
-      headers: {
-        "Authorization": getAuthHeader(env.ZYTE_API_KEY),
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-      },
-      body: JSON.stringify({
+  const maxAttempts = options.retry520 ? 3 : 1;
+  const attempts = [];
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const body = {
         url: productUrl,
         product: true,
         productOptions: {
           extractFrom
         }
-      })
-    });
+      };
 
-    const text = await response.text();
-    let data = null;
-    try { data = JSON.parse(text); } catch {}
-    const product = data?.product || null;
-    const price = cleanPrice(product?.price);
-    const currency = String(product?.currency || "").toUpperCase();
-    const probability = Number(product?.metadata?.probability ?? 0);
+      // H&M's UK product URLs should be fetched from the UK side where
+      // practical; Zyte otherwise chooses the best location automatically.
+      if (options.geolocation) body.geolocation = options.geolocation;
 
-    return {
-      ok: response.ok && !!product && price !== null && price > 0 && currency,
-      status: response.status,
-      extractFrom,
-      price,
-      currency,
-      probability,
-      product,
-      responsePreview: response.ok ? null : text.slice(0, 1500)
-    };
-  } catch (error) {
-    return {
-      ok: false,
-      reason: "zyte_request_failed",
-      extractFrom,
-      error: String(error?.message || error)
-    };
+      const response = await fetch("https://api.zyte.com/v1/extract", {
+        method: "POST",
+        headers: {
+          "Authorization": getAuthHeader(env.ZYTE_API_KEY),
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify(body)
+      });
+
+      const text = await response.text();
+      let data = null;
+      try { data = JSON.parse(text); } catch {}
+      const product = data?.product || null;
+      const price = cleanPrice(product?.price);
+      const currency = String(product?.currency || "").toUpperCase();
+      const probability = Number(product?.metadata?.probability ?? 0);
+
+      attempts.push({
+        attempt,
+        status: response.status,
+        price,
+        currency,
+        probability,
+        ok: response.ok
+      });
+
+      const result = {
+        ok: response.ok && !!product && price !== null && price > 0 && currency,
+        status: response.status,
+        extractFrom,
+        price,
+        currency,
+        probability,
+        product,
+        attempts,
+        responsePreview: response.ok ? null : text.slice(0, 1500)
+      };
+
+      if (result.ok || response.status !== 520 || attempt === maxAttempts) return result;
+
+      // Zyte documents 520 as a temporary ban response and recommends
+      // retrying; unsuccessful responses are not charged.
+      await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+    } catch (error) {
+      attempts.push({ attempt, networkError: String(error?.message || error) });
+      if (attempt === maxAttempts) {
+        return {
+          ok: false,
+          reason: "zyte_request_failed",
+          extractFrom,
+          attempts,
+          error: String(error?.message || error)
+        };
+      }
+    }
   }
+
+  return { ok: false, reason: "zyte_request_failed", extractFrom, attempts };
+}
+
+function getZyteOptions(productUrl) {
+  try {
+    const url = new URL(productUrl);
+    const path = url.pathname.toLowerCase();
+    if (HM_HOSTS.has(url.hostname.toLowerCase()) && path.includes("/en_gb/")) {
+      return { browserRetry520: true, geolocation: "GB" };
+    }
+  } catch {}
+  return { browserRetry520: true };
 }
 
 async function getZyteProduct(env, productUrl) {
-  // Cheapest/fastest path first. Only pay for browser rendering when the
+  const options = getZyteOptions(productUrl);
+
+  // Cheapest/fastest path first. Only use browser rendering when the
   // ordinary HTTP response doesn't contain a usable product price.
   const http = await zyteProduct(env, productUrl, "httpResponseBody");
   if (http.ok && http.probability >= 0.5) return { ...http, source: "zyte_http_product" };
 
-  const browser = await zyteProduct(env, productUrl, "browserHtml");
+  const browser = await zyteProduct(env, productUrl, "browserHtml", {
+    retry520: options.browserRetry520,
+    geolocation: options.geolocation
+  });
   if (browser.ok && browser.probability >= 0.5) return { ...browser, source: "zyte_browser_product" };
 
-  // Keep a usable extraction even when Zyte's probability is conservative,
-  // provided it returned a positive price.
   if (http.ok) return { ...http, source: "zyte_http_product" };
   if (browser.ok) return { ...browser, source: "zyte_browser_product" };
 
@@ -187,8 +234,6 @@ export default {
       const destination = (url.searchParams.get("destination") || "").toUpperCase().trim();
 
       if (productUrl && destination) {
-        // First let the existing/native resolver have a go. This keeps easy
-        // retailers free and preserves all current estimate logic.
         try {
           const nativeResponse = await currentWorker.fetch(request, env);
           const nativeText = await nativeResponse.clone().text();
