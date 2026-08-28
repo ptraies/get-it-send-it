@@ -176,9 +176,12 @@ async function hmApiDiagnostics(articleCode) {
   const candidates = [
     `https://www2.hm.com/hmwebservices/service/product/gb/availability/${baseProductCode}.json`,
     `https://tags.tiqcdn.com/dle/hm/hdl/${code}.json`,
-    `https://api.hm.com/search-services/v1/en_gb/listing/resultpage?query=${encodeURIComponent(code)}&page=1&pageSize=72`,
-    `https://api.hm.com/search-services/v1/en_gb/listing/resultpage?q=${encodeURIComponent(code)}&page=1&pageSize=72`,
-    `https://api.hm.com/search-services/v1/en_gb/listing/resultpage?searchTerm=${encodeURIComponent(code)}&page=1&pageSize=72`
+    `https://api.hm.com/search-services/v1/en_gb/listing/resultpage?query=${encodeURIComponent(code)}&page=1&pageSize=72&touchPoint=DESKTOP&pageId=search&categoryId=all`,
+    `https://api.hm.com/search-services/v1/en_gb/listing/resultpage?q=${encodeURIComponent(code)}&page=1&pageSize=72&touchPoint=DESKTOP&pageId=search&categoryId=all`,
+    `https://api.hm.com/search-services/v1/en_gb/listing/resultpage?searchTerm=${encodeURIComponent(code)}&page=1&pageSize=72&touchPoint=DESKTOP&pageId=search&categoryId=all`,
+    `https://api.hm.com/search-services/v1/en_gb/listing/resultpage?query=${encodeURIComponent(code)}&page=1&pageSize=72&touchPoint=WEB&pageId=search&categoryId=all`,
+    `https://api.hm.com/search-services/v1/en_gb/listing/resultpage?query=${encodeURIComponent(code)}&page=1&pageSize=72&touchPoint=desktop&pageId=search&categoryId=ladies` ,
+    `https://api.hm.com/search-services/v1/en_gb/listing/resultpage?query=${encodeURIComponent(code)}&page=1&pageSize=72&touchPoint=DESKTOP&pageId=1&categoryId=ladies`
   ];
   return Promise.all(candidates.map(url => probeHM(url, code)));
 }
