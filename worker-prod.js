@@ -58,7 +58,7 @@ export default {
               quantityBadge.remove();
               const firstRow = breakdown.querySelector('div');
               const firstLabel = firstRow?.querySelector('strong');
-              if (firstLabel) firstLabel.textContent = `Product Price (${match[0]} × quantity)`;
+              if (firstLabel) firstLabel.textContent = "Product Price (" + match[0] + " × quantity)";
             };
 
             document.addEventListener('click', event => {
