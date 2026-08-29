@@ -63,7 +63,7 @@ export default {
 
               const firstRow = breakdown.querySelector('div');
               const firstLabel = firstRow?.querySelector('strong');
-              if (firstLabel) firstLabel.textContent = `Product Price (${quantity} × quantity)`;
+              if (firstLabel) firstLabel.textContent = "Product Price (" + quantity + " × quantity)";
 
               const allTextNodes = [];
               const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
