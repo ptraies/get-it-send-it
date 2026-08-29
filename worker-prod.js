@@ -45,12 +45,32 @@ export default {
               note.textContent = 'Product details will be verified from the link you provided.';
               summary.appendChild(note);
             };
+
+            const cleanEstimateQuantity = () => {
+              const meta = document.getElementById('meta');
+              const breakdown = document.getElementById('breakdown');
+              if (!meta || !breakdown) return;
+
+              const quantityBadge = Array.from(meta.querySelectorAll('.badge')).find(el => /^Quantity\\s+\\d+$/i.test((el.textContent || '').trim()));
+              const match = (quantityBadge?.textContent || '').match(/\\d+/);
+              if (!match) return;
+
+              quantityBadge.remove();
+              const firstRow = breakdown.querySelector('div');
+              const firstLabel = firstRow?.querySelector('strong');
+              if (firstLabel) firstLabel.textContent = `Product Price (${match[0]} × quantity)`;
+            };
+
             document.addEventListener('click', event => {
               const button = event.target.closest('button');
               if (button && /official quote/i.test(button.textContent || '')) setTimeout(cleanQuoteSummary, 0);
             });
-            new MutationObserver(cleanQuoteSummary).observe(document.documentElement, {subtree:true, childList:true, characterData:true});
+            new MutationObserver(() => {
+              cleanQuoteSummary();
+              cleanEstimateQuantity();
+            }).observe(document.documentElement, {subtree:true, childList:true, characterData:true});
             cleanQuoteSummary();
+            cleanEstimateQuantity();
           })();
         </script></body>`
       );
