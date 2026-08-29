@@ -1,316 +1,37 @@
 import { TAX_PROFILES } from "./tax-profiles.js";
 
-const RULES_VERSION = "2026-08-29.1";
+const RULES_VERSION = "2026-08-29.2";
 const SERVICE_FEE_MIN_GBP = 15;
 const SERVICE_FEE_RATE = 0.15;
 const ALLOWED_PROTOCOLS = new Set(["http:", "https:"]);
 const MAX_QUANTITY = 99;
 
 function jsonResponse(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      "content-type": "application/json; charset=UTF-8",
-      "access-control-allow-origin": "*",
-      "cache-control": "no-store"
-    }
-  });
+  return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=UTF-8", "access-control-allow-origin": "*", "cache-control": "no-store" } });
 }
+function n(value) { const x = Number(value); return Number.isFinite(x) ? x : null; }
+function cleanPrice(value) { if (typeof value === "number" && Number.isFinite(value)) return value; if (typeof value !== "string") return null; const cleaned = value.replace(/[^0-9.,-]/g, "").trim(); if (!cleaned) return null; const normalised = cleaned.replace(/,(?=\d{3}(?:\D|$))/g, ""); const number = Number.parseFloat(normalised); return Number.isFinite(number) ? number : null; }
+function normaliseCurrency(currency) { if (!currency) return null; const value = String(currency).toUpperCase().trim(); return ({ "£": "GBP", "$": "USD", "€": "EUR" })[value] || value; }
+function isPrivateHostname(hostname) { const host = String(hostname || "").toLowerCase(); if (["localhost", "127.0.0.1", "::1"].includes(host) || host.endsWith(".localhost") || host.endsWith(".local")) return true; const parts = host.split(".").map(Number); if (parts.length !== 4 || !parts.every((p) => Number.isInteger(p) && p >= 0 && p <= 255)) return false; const [a, b] = parts; return a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168); }
+function extractJsonLd(html) { const values = []; for (const match of String(html || "").matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) { try { values.push(JSON.parse(match[1].trim())); } catch {} } return values; }
+function findProductOffer(value) { if (!value || typeof value !== "object") return null; if (Array.isArray(value)) { for (const item of value) { const result = findProductOffer(item); if (result) return result; } return null; } const type = Array.isArray(value["@type"]) ? value["@type"].map(String).join(" ") : String(value["@type"] || ""); if (/product/i.test(type) && value.offers) { const offers = Array.isArray(value.offers) ? value.offers : [value.offers]; for (const offer of offers) { const price = cleanPrice(offer?.price); if (price !== null) return { name: value.name || null, price, currency: normaliseCurrency(offer?.priceCurrency), availability: offer?.availability || null, source: "json_ld" }; } } for (const key of Object.keys(value)) { const result = findProductOffer(value[key]); if (result) return result; } return null; }
+function extractProductFromHtml(html) { for (const data of extractJsonLd(html)) { const result = findProductOffer(data); if (result) return result; } return null; }
+function getShopifyProductUrl(productUrl) { const url = new URL(productUrl); const match = url.pathname.match(/\/products\/([^/?#]+)/i); if (!match) return null; const handle = decodeURIComponent(match[1]); return `${url.origin}/products/${encodeURIComponent(handle)}.js`; }
+async function fetchShopifyProduct(productUrl) { let endpoint; try { endpoint = getShopifyProductUrl(productUrl); } catch { return null; } if (!endpoint) return null; try { const response = await fetch(endpoint, { headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 (compatible; GetItSendIt/2.0; +https://getitsendit.co.uk)" }, redirect: "follow", cache: "no-store" }); if (!response.ok) return null; const data = await response.json(); const variants = Array.isArray(data?.variants) ? data.variants : []; const raw = data?.price ?? data?.price_min ?? variants.find((v) => v?.available)?.price ?? variants[0]?.price; const numeric = cleanPrice(raw); if (numeric === null || numeric <= 0) return null; const price = numeric / 100; if (!Number.isFinite(price) || price <= 0 || price >= 100000) return null; return { name: data?.title || null, price, currency: normaliseCurrency(data?.currency) || "GBP", availability: data?.available === false ? "OutOfStock" : data?.available === true ? "InStock" : null, source: "shopify_ajax" }; } catch { return null; } }
+async function fetchRetailer(url) { const response = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 (compatible; GetItSendIt/2.0; +https://getitsendit.co.uk)", Accept: "text/html,application/xhtml+xml" }, redirect: "follow", cache: "no-store" }); if (!response.ok) return { ok: false, status: response.status }; const contentType = response.headers.get("content-type") || ""; if (!contentType.includes("text/html")) return { ok: false, status: 422 }; return { ok: true, html: await response.text(), finalUrl: response.url }; }
+function stripHtml(html) { return String(html || "").replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/gi, " ").replace(/&pound;/gi, "£").replace(/&#163;/gi, "£").replace(/&amp;/gi, "&").replace(/&quot;/gi, '"').replace(/&#39;/gi, "'").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/\s+/g, " ").trim(); }
+function extractShippingLinks(html, baseUrl) { const links = []; const base = new URL(baseUrl); for (const match of String(html || "").matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)) { const text = stripHtml(match[2]); if (!/(shipping|delivery|postage|dispatch)/i.test(text)) continue; try { const url = new URL(match[1], baseUrl); if (url.origin === base.origin) links.push(url.toString()); } catch {} } return [...new Set(links)].slice(0, 5); }
+function parseUkShipping(text, productPrice) { const clean = String(text || "").replace(/\s+/g, " ").trim(); if (/(?:free|no\s+(?:cost|charge))\s+(?:standard\s+)?(?:uk|u\.k\.|united kingdom)?\s*(?:delivery|shipping|postage)/i.test(clean) && !/from\s+£?\s*\d/i.test(clean)) return { status: "confirmed", amount: 0, basis: "Retailer information states UK delivery is free." }; for (const match of clean.matchAll(/(?:free|£\s*0)[^\.]{0,120}(?:over|above|from|orders?\s+of|orders?\s+over)\s*£?\s*([\d,.]+)/gi)) { const threshold = cleanPrice(match[1]); if (threshold !== null && productPrice !== null && productPrice >= threshold) return { status: "confirmed", amount: 0, basis: `Free UK delivery applies above £${threshold.toFixed(2)}.` }; } const patterns = [/(?:uk|u\.k\.|united kingdom)[^\.]{0,120}(?:delivery|shipping|postage)[^£$€\d]{0,20}(?:£|GBP\s*)\s*([\d,.]+)/i,/(?:delivery|shipping|postage)[^\.]{0,80}(?:£|GBP\s*)\s*([\d,.]+)[^\.]{0,80}(?:uk|u\.k\.|united kingdom)/i,/(?:standard\s+)?(?:delivery|shipping|postage)[^£$€\d]{0,20}(?:£|GBP\s*)\s*([\d,.]+)/i]; for (const pattern of patterns) { const match = clean.match(pattern); const amount = cleanPrice(match?.[1]); if (amount !== null && amount >= 0 && amount <= 100) return { status: "confirmed", amount, basis: "UK delivery charge found in retailer information." }; } if (/calculated\s+at\s+checkout/i.test(clean)) return { status: "unknown", amount: null, basis: "Retailer calculates delivery at checkout." }; return { status: "unknown", amount: null, basis: "We could not establish a reliable UK delivery charge from the retailer information we could access." }; }
+async function findUkShipping(html, finalUrl, productPrice) { const direct = parseUkShipping(stripHtml(html), productPrice); if (direct.status === "confirmed") return direct; for (const link of extractShippingLinks(html, finalUrl)) { try { const page = await fetchRetailer(link); if (!page.ok) continue; const policy = parseUkShipping(stripHtml(page.html), productPrice); if (policy.status === "confirmed") return { ...policy, source: link }; } catch {} } return direct; }
+function shippingRangeFor(country) { const exact = { AU: [24,42], NZ: [25,43], US: [20,35], CA: [22,38], JP: [22,38], KR: [23,40], SG: [23,40], AE: [24,42], IN: [22,40], ZA: [25,45], BR: [27,48], AR: [29,50], CL: [27,48], IL: [24,42], TR: [22,40], NO: [20,35], CH: [19,34], IS: [22,38], DE: [15,25], FR: [15,25], ES: [16,27], NL: [15,25], BE: [15,25], AT: [16,27], IE: [16,27], IT: [17,29], PT: [18,30], SE: [18,30], DK: [18,30], FI: [19,32], PL: [17,29], CZ: [17,29], GR: [19,32], HU: [18,30], RO: [18,31], HR: [18,31] }; if (exact[country]) return { low: exact[country][0], high: exact[country][1], scope: "country" }; const regions = { europe: [18,32], northAmerica: [22,38], centralAmerica: [25,45], southAmerica: [27,50], caribbean: [27,50], middleEast: [24,44], northAfrica: [24,44], subSaharanAfrica: [27,50], eastAsia: [23,42], southAsia: [23,42], southEastAsia: [24,44], centralAsia: [25,46], oceania: [24,44], other: [28,55] }; const regionMap = { AU:"oceania", FJ:"oceania", KI:"oceania", MH:"oceania", FM:"oceania", NR:"oceania", NZ:"oceania", PW:"oceania", PG:"oceania", WS:"oceania", SB:"oceania", TO:"oceania", TV:"oceania", VU:"oceania", US:"northAmerica", CA:"northAmerica" }; const region = regionMap[country] || "other"; return { low: regions[region][0], high: regions[region][1], scope: "regional", region }; }
+function getTaxProfile(country) { const rule = TAX_PROFILES?.[country]; if (!rule) return null; const minRate = n(rule.minRate); const maxRate = n(rule.maxRate); if (minRate === null || maxRate === null) return null; return { ...rule, minRate, maxRate }; }
+async function convertToGbp(amount, currency) { const code = normaliseCurrency(currency) || "GBP"; if (code === "GBP") return { status: "confirmed", amount, currency: "GBP", source: "retailer" }; try { const response = await fetch(`https://api.frankfurter.dev/v2/rate/${encodeURIComponent(code)}/GBP`, { headers: { Accept: "application/json" }, cf: { cacheTtl: 3600, cacheEverything: true } }); if (!response.ok) throw new Error("FX lookup failed"); const data = await response.json(); const rate = n(data?.rate); if (rate === null || rate <= 0) throw new Error("Invalid FX rate"); return { status: "estimated", amount: amount * rate, currency: "GBP", rate, source: "Frankfurter/ECB reference-rate service", basis: "Converted using the latest available reference rate." }; } catch { return { status: "unknown", amount: null, currency: "GBP", basis: `We could not obtain a current ${code}/GBP reference rate.` }; } }
+function calculateServiceFee(productPriceGbp) { return Math.round(Math.max(SERVICE_FEE_MIN_GBP, productPriceGbp * SERVICE_FEE_RATE) * 100) / 100; }
+function calculateTax(profile, productGbp, ukShipping, destinationShipping) { if (!profile) return { status: "unknown", low: null, high: null, label: "Estimated local taxes & import charges", basis: "We do not yet have a verified destination tax profile for this country. The estimate is shown before destination import taxes." }; if (!destinationShipping) return { status: "unknown", low: null, high: null, label: profile.taxName || "Import tax", basis: "We do not have enough information to establish the customs-value range." }; const uk = ukShipping?.status === "confirmed" ? n(ukShipping.amount) || 0 : 0; const baseLow = productGbp + uk + destinationShipping.low; const baseHigh = productGbp + uk + destinationShipping.high; return { status: "indicative", low: baseLow * profile.minRate, high: baseHigh * profile.maxRate, label: `Potential ${profile.taxName || "tax"}`, rateMin: profile.minRate, rateMax: profile.maxRate, basis: `${profile.displayRate || `${(profile.minRate * 100).toFixed(1)}%`} standard-rate planning indication applied across the estimated customs-value range. This is not a customs quote and does not include potentially applicable duty, exemptions, reduced rates or carrier/clearance fees. ${profile.note || "Actual treatment may vary by product and import arrangement."}` }; }
+function calculateEstimate({ productGbp, quantity, ukShipping, destinationShipping, destination, weightKg }) { const q = Math.max(1, Math.min(MAX_QUANTITY, Math.floor(n(quantity) || 1))); const productTotal = Math.round(productGbp * q * 100) / 100; const fee = calculateServiceFee(productTotal); let shipping = destinationShipping; if (shipping && q > 1 && n(weightKg) !== null && n(weightKg) > 0) { const totalWeight = n(weightKg) * q; const weightFactor = Math.min(3.5, Math.max(1, Math.sqrt(totalWeight / n(weightKg)))); shipping = { ...shipping, low: Math.round(shipping.low * weightFactor * 100) / 100, high: Math.round(shipping.high * weightFactor * 100) / 100, quantity: q, weightKg: totalWeight, basis: `${shipping.basis} Quantity is combined into one shipment and the range is adjusted only where a reliable product weight is available; it is not multiplied one-for-one.` }; } else if (shipping && q > 1) { shipping = { ...shipping, quantity: q, basis: `${shipping.basis} ${q} identical items are treated as one combined shipment. No quantity multiplier is applied until reliable weight or dimensions are available, so we do not pretend that six items cost six times as much to ship.` }; } const tax = calculateTax(getTaxProfile(destination), productTotal, ukShipping, shipping); const uk = ukShipping?.status === "confirmed" ? n(ukShipping.amount) || 0 : 0; const low = productTotal + fee + uk + (shipping ? shipping.low : 0) + (tax.low ?? 0); const high = productTotal + fee + uk + (shipping ? shipping.high : 0) + (tax.high ?? 0); const unresolved = []; if (ukShipping?.status !== "confirmed") unresolved.push("Retailer → UK delivery"); if (!shipping) unresolved.push("UK → destination shipping"); return { product: { status: "confirmed", amount: productTotal, unitPriceGbp: productGbp, quantity: q }, ukShipping, destinationShipping: shipping, serviceFee: { status: "confirmed", amount: fee, minimum: SERVICE_FEE_MIN_GBP, rate: SERVICE_FEE_RATE, basis: "The greater of £15 or 15% of the product price only. Shipping and destination taxes are excluded." }, importTax: tax, customsDuty: { status: "unknown", low: null, high: null, label: "Customs duty", basis: "Not included. A defensible duty calculation normally requires product classification, origin and destination-specific tariff information." }, total: { status: unresolved.length === 0 ? "estimated" : "partial", low: Math.round(low * 100) / 100, high: Math.round(high * 100) / 100, currency: "GBP", quantity: q }, unresolved, rulesVersion: RULES_VERSION }; }
 
-function n(value) {
-  const x = Number(value);
-  return Number.isFinite(x) ? x : null;
-}
+async function extractWithZyte(env, productUrl) { if (!env?.ZYTE_API_KEY) return null; const bytes = new TextEncoder().encode(`${env.ZYTE_API_KEY}:`); let binary = ""; for (const byte of bytes) binary += String.fromCharCode(byte); const auth = `Basic ${btoa(binary)}`; for (const extractFrom of ["httpResponseBody", "browserHtml"]) { try { const response = await fetch("https://api.zyte.com/v1/extract", { method: "POST", headers: { Authorization: auth, "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ url: productUrl, product: true, productOptions: { extractFrom, ai: true }, ...(extractFrom === "browserHtml" ? { browserHtml: true } : { httpResponseBody: true }) }) }); const data = await response.json(); const product = data?.product; const price = cleanPrice(product?.price); const currency = normaliseCurrency(product?.currency); if (response.ok && product && price !== null && currency) return { name: product.name || null, price, currency, availability: product.availability || null, weightKg: n(product?.weight?.value ?? product?.weightKg ?? product?.weight), source: `zyte_${extractFrom}` }; } catch {} } return null; }
 
-function cleanPrice(value) {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value !== "string") return null;
-  const cleaned = value.replace(/[^0-9.,-]/g, "").trim();
-  if (!cleaned) return null;
-  const normalised = cleaned.replace(/,(?=\d{3}(?:\D|$))/g, "");
-  const number = Number.parseFloat(normalised);
-  return Number.isFinite(number) ? number : null;
-}
+async function resolveProduct(env, url) { const zyte = await extractWithZyte(env, url); if (zyte) return zyte; const shopify = await fetchShopifyProduct(url); if (shopify) return shopify; try { const page = await fetchRetailer(url); if (page.ok) { const product = extractProductFromHtml(page.html); if (product) return product; } } catch {} return null; }
 
-function normaliseCurrency(currency) {
-  if (!currency) return null;
-  const value = String(currency).toUpperCase().trim();
-  return ({ "£": "GBP", "$": "USD", "€": "EUR" })[value] || value;
-}
-
-function isPrivateHostname(hostname) {
-  const host = String(hostname || "").toLowerCase();
-  if (["localhost", "127.0.0.1", "::1"].includes(host) || host.endsWith(".localhost") || host.endsWith(".local")) return true;
-  const parts = host.split(".").map(Number);
-  if (parts.length !== 4 || !parts.every((p) => Number.isInteger(p) && p >= 0 && p <= 255)) return false;
-  const [a, b] = parts;
-  return a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
-}
-
-function extractJsonLd(html) {
-  const values = [];
-  for (const match of String(html || "").matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
-    try { values.push(JSON.parse(match[1].trim())); } catch {}
-  }
-  return values;
-}
-
-function findProductOffer(value) {
-  if (!value || typeof value !== "object") return null;
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const result = findProductOffer(item);
-      if (result) return result;
-    }
-    return null;
-  }
-  const type = Array.isArray(value["@type"]) ? value["@type"].map(String).join(" ") : String(value["@type"] || "");
-  if (/product/i.test(type) && value.offers) {
-    const offers = Array.isArray(value.offers) ? value.offers : [value.offers];
-    for (const offer of offers) {
-      const price = cleanPrice(offer?.price);
-      if (price !== null) {
-        return { name: value.name || null, price, currency: normaliseCurrency(offer?.priceCurrency), availability: offer?.availability || null, source: "json_ld" };
-      }
-    }
-  }
-  for (const key of Object.keys(value)) {
-    const result = findProductOffer(value[key]);
-    if (result) return result;
-  }
-  return null;
-}
-
-function extractProductFromHtml(html) {
-  for (const data of extractJsonLd(html)) {
-    const result = findProductOffer(data);
-    if (result) return result;
-  }
-  return null;
-}
-
-function getShopifyProductUrl(productUrl) {
-  const url = new URL(productUrl);
-  const match = url.pathname.match(/\/products\/([^/?#]+)/i);
-  if (!match) return null;
-  const handle = decodeURIComponent(match[1]);
-  return `${url.origin}/products/${encodeURIComponent(handle)}.js`;
-}
-
-async function fetchShopifyProduct(productUrl) {
-  let endpoint;
-  try { endpoint = getShopifyProductUrl(productUrl); } catch { return null; }
-  if (!endpoint) return null;
-  try {
-    const response = await fetch(endpoint, { headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 (compatible; GetItSendIt/2.0; +https://getitsendit.co.uk)" }, redirect: "follow", cache: "no-store" });
-    if (!response.ok) return null;
-    const data = await response.json();
-    const variants = Array.isArray(data?.variants) ? data.variants : [];
-    const raw = data?.price ?? data?.price_min ?? variants.find((v) => v?.available)?.price ?? variants[0]?.price;
-    const numeric = cleanPrice(raw);
-    if (numeric === null || numeric <= 0) return null;
-    const price = numeric / 100;
-    if (!Number.isFinite(price) || price <= 0 || price >= 100000) return null;
-    return { name: data?.title || null, price, currency: normaliseCurrency(data?.currency) || "GBP", availability: data?.available === false ? "OutOfStock" : data?.available === true ? "InStock" : null, source: "shopify_ajax" };
-  } catch { return null; }
-}
-
-async function fetchRetailer(url) {
-  const response = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 (compatible; GetItSendIt/2.0; +https://getitsendit.co.uk)", Accept: "text/html,application/xhtml+xml" }, redirect: "follow", cache: "no-store" });
-  if (!response.ok) return { ok: false, status: response.status };
-  const contentType = response.headers.get("content-type") || "";
-  if (!contentType.includes("text/html")) return { ok: false, status: 422 };
-  return { ok: true, html: await response.text(), finalUrl: response.url };
-}
-
-function stripHtml(html) {
-  return String(html || "").replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/gi, " ").replace(/&pound;/gi, "£").replace(/&#163;/gi, "£").replace(/&amp;/gi, "&").replace(/&quot;/gi, '"').replace(/&#39;/gi, "'").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/\s+/g, " ").trim();
-}
-
-function extractShippingLinks(html, baseUrl) {
-  const links = [];
-  const base = new URL(baseUrl);
-  for (const match of String(html || "").matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
-    const text = stripHtml(match[2]);
-    if (!/(shipping|delivery|postage|dispatch)/i.test(text)) continue;
-    try {
-      const url = new URL(match[1], baseUrl);
-      if (url.origin === base.origin) links.push(url.toString());
-    } catch {}
-  }
-  return [...new Set(links)].slice(0, 5);
-}
-
-function parseUkShipping(text, productPrice) {
-  const clean = String(text || "").replace(/\s+/g, " ").trim();
-  if (/(?:free|no\s+(?:cost|charge))\s+(?:standard\s+)?(?:uk|u\.k\.|united kingdom)?\s*(?:delivery|shipping|postage)/i.test(clean) && !/from\s+£?\s*\d/i.test(clean)) return { status: "confirmed", amount: 0, basis: "Retailer information states UK delivery is free." };
-  for (const match of clean.matchAll(/(?:free|£\s*0)[^\.]{0,120}(?:over|above|from|orders?\s+of|orders?\s+over)\s*£?\s*([\d,.]+)/gi)) {
-    const threshold = cleanPrice(match[1]);
-    if (threshold !== null && productPrice !== null && productPrice >= threshold) return { status: "confirmed", amount: 0, basis: `Free UK delivery applies above £${threshold.toFixed(2)}.` };
-  }
-  const patterns = [
-    /(?:uk|u\.k\.|united kingdom)[^\.]{0,120}(?:delivery|shipping|postage)[^£$€\d]{0,20}(?:£|GBP\s*)\s*([\d,.]+)/i,
-    /(?:delivery|shipping|postage)[^\.]{0,80}(?:£|GBP\s*)\s*([\d,.]+)[^\.]{0,80}(?:uk|u\.k\.|united kingdom)/i,
-    /(?:standard\s+)?(?:delivery|shipping|postage)[^£$€\d]{0,20}(?:£|GBP\s*)\s*([\d,.]+)/i
-  ];
-  for (const pattern of patterns) {
-    const match = clean.match(pattern);
-    const amount = cleanPrice(match?.[1]);
-    if (amount !== null && amount >= 0 && amount <= 100) return { status: "confirmed", amount, basis: "UK delivery charge found in retailer information." };
-  }
-  if (/calculated\s+at\s+checkout/i.test(clean)) return { status: "unknown", amount: null, basis: "Retailer calculates delivery at checkout." };
-  return { status: "unknown", amount: null, basis: "We could not establish a reliable UK delivery charge from the retailer information we could access." };
-}
-
-async function findUkShipping(html, finalUrl, productPrice) {
-  const direct = parseUkShipping(stripHtml(html), productPrice);
-  if (direct.status === "confirmed") return direct;
-  for (const link of extractShippingLinks(html, finalUrl)) {
-    try {
-      const page = await fetchRetailer(link);
-      if (!page.ok) continue;
-      const policy = parseUkShipping(stripHtml(page.html), productPrice);
-      if (policy.status === "confirmed") return { ...policy, source: link };
-    } catch {}
-  }
-  return direct;
-}
-
-function shippingRangeFor(country) {
-  const exact = {
-    AU: [24, 42], NZ: [25, 43], US: [20, 35], CA: [22, 38], JP: [22, 38], KR: [23, 40], SG: [23, 40], AE: [24, 42], IN: [22, 40], ZA: [25, 45], BR: [27, 48], AR: [29, 50], CL: [27, 48], IL: [24, 42], TR: [22, 40], NO: [20, 35], CH: [19, 34], IS: [22, 38], DE: [15, 25], FR: [15, 25], ES: [16, 27], NL: [15, 25], BE: [15, 25], AT: [16, 27], IE: [16, 27], IT: [17, 29], PT: [18, 30], SE: [18, 30], DK: [18, 30], FI: [19, 32], PL: [17, 29], CZ: [17, 29], GR: [19, 32], HU: [18, 30], RO: [18, 31], HR: [18, 31]
-  };
-  if (exact[country]) return { low: exact[country][0], high: exact[country][1], scope: "country" };
-  const regions = { europe: [18,32], northAmerica: [22,38], centralAmerica: [25,45], southAmerica: [27,50], caribbean: [27,50], middleEast: [24,44], northAfrica: [24,44], subSaharanAfrica: [27,50], eastAsia: [23,42], southAsia: [23,42], southEastAsia: [24,44], centralAsia: [25,46], oceania: [24,44], other: [28,55] };
-  const regionMap = { AU:"oceania", FJ:"oceania", KI:"oceania", MH:"oceania", FM:"oceania", NR:"oceania", NZ:"oceania", PW:"oceania", PG:"oceania", WS:"oceania", SB:"oceania", TO:"oceania", TV:"oceania", VU:"oceania", US:"northAmerica", CA:"northAmerica" };
-  const region = regionMap[country] || "other";
-  return { low: regions[region][0], high: regions[region][1], scope: "regional", region };
-}
-
-function getTaxProfile(country) {
-  const rule = TAX_PROFILES?.[country];
-  if (!rule) return null;
-  const minRate = n(rule.minRate);
-  const maxRate = n(rule.maxRate);
-  if (minRate === null || maxRate === null) return null;
-  return { ...rule, minRate, maxRate };
-}
-
-async function convertToGbp(amount, currency) {
-  const code = normaliseCurrency(currency) || "GBP";
-  if (code === "GBP") return { status: "confirmed", amount, currency: "GBP", source: "retailer" };
-  try {
-    const response = await fetch(`https://api.frankfurter.dev/v2/rate/${encodeURIComponent(code)}/GBP`, { headers: { Accept: "application/json" }, cf: { cacheTtl: 3600, cacheEverything: true } });
-    if (!response.ok) throw new Error("FX lookup failed");
-    const data = await response.json();
-    const rate = n(data?.rate);
-    if (rate === null || rate <= 0) throw new Error("Invalid FX rate");
-    return { status: "estimated", amount: amount * rate, currency: "GBP", rate, source: "Frankfurter/ECB reference-rate service", basis: "Converted using the latest available reference rate." };
-  } catch {
-    return { status: "unknown", amount: null, currency: "GBP", basis: `We could not obtain a current ${code}/GBP reference rate.` };
-  }
-}
-
-function calculateServiceFee(productPriceGbp) {
-  return Math.round(Math.max(SERVICE_FEE_MIN_GBP, productPriceGbp * SERVICE_FEE_RATE) * 100) / 100;
-}
-
-function calculateTax(profile, productGbp, ukShipping, destinationShipping) {
-  if (!profile) return { status: "unknown", low: null, high: null, label: "Estimated local taxes & import charges", basis: "We do not yet have a verified destination tax profile for this country. The estimate is shown before destination import taxes." };
-  if (!destinationShipping) return { status: "unknown", low: null, high: null, label: profile.taxName || "Import tax", basis: "We do not have enough information to establish the customs-value range." };
-  const uk = ukShipping?.status === "confirmed" ? n(ukShipping.amount) || 0 : 0;
-  const baseLow = productGbp + uk + destinationShipping.low;
-  const baseHigh = productGbp + uk + destinationShipping.high;
-  return { status: "indicative", low: baseLow * profile.minRate, high: baseHigh * profile.maxRate, label: `Potential ${profile.taxName || "tax"}`, rateMin: profile.minRate, rateMax: profile.maxRate, basis: `${profile.displayRate || `${(profile.minRate * 100).toFixed(1)}%`} standard-rate planning indication applied across the estimated customs-value range. This is not a customs quote and does not include potentially applicable duty, exemptions, reduced rates or carrier/clearance fees. ${profile.note || "Actual treatment may vary by product and import arrangement."}` };
-}
-
-function calculateEstimate({ productGbp, quantity, ukShipping, destinationShipping, destination }) {
-  const q = Math.max(1, Math.min(MAX_QUANTITY, Math.floor(n(quantity) || 1)));
-  const productTotal = Math.round(productGbp * q * 100) / 100;
-  const fee = calculateServiceFee(productTotal);
-  const unitWeight = null;
-  let shipping = destinationShipping;
-  if (shipping && q > 1) {
-    const multiplier = Math.min(4.5, q === 2 ? 1.55 : q === 3 ? 1.95 : q <= 5 ? 2.35 : q <= 10 ? 3.2 : 4.5);
-    shipping = { ...shipping, low: Math.round(shipping.low * multiplier * 100) / 100, high: Math.round(shipping.high * multiplier * 100) / 100, quantity: q, basis: `${shipping.basis} Multiple identical units are treated as one combined shipment where practical; shipping is not assumed to multiply one-for-one.` };
-  }
-  const tax = calculateTax(getTaxProfile(destination), productTotal, ukShipping, shipping);
-  const uk = ukShipping?.status === "confirmed" ? n(ukShipping.amount) || 0 : 0;
-  const low = productTotal + fee + uk + (shipping ? shipping.low : 0) + (tax.low ?? 0);
-  const high = productTotal + fee + uk + (shipping ? shipping.high : 0) + (tax.high ?? 0);
-  const unresolved = [];
-  if (ukShipping?.status !== "confirmed") unresolved.push("Retailer → UK delivery");
-  if (!shipping) unresolved.push("UK → destination shipping");
-  return { product: { status: "confirmed", amount: productTotal, unitPriceGbp: productGbp, quantity: q }, ukShipping, destinationShipping: shipping, serviceFee: { status: "confirmed", amount: fee, minimum: SERVICE_FEE_MIN_GBP, rate: SERVICE_FEE_RATE, basis: "The greater of £15 or 15% of the product price only. Shipping and destination taxes are excluded." }, importTax: tax, customsDuty: { status: "unknown", low: null, high: null, label: "Customs duty", basis: "Not included. A defensible duty calculation normally requires product classification, origin and destination-specific tariff information." }, total: { status: unresolved.length === 0 ? "estimated" : "partial", low: Math.round(low * 100) / 100, high: Math.round(high * 100) / 100, currency: "GBP", quantity: q }, unresolved, rulesVersion: RULES_VERSION };
-}
-
-async function extractWithZyte(env, productUrl) {
-  if (!env?.ZYTE_API_KEY) return null;
-  const bytes = new TextEncoder().encode(`${env.ZYTE_API_KEY}:`);
-  let binary = ""; for (const byte of bytes) binary += String.fromCharCode(byte);
-  const auth = `Basic ${btoa(binary)}`;
-  for (const extractFrom of ["httpResponseBody", "browserHtml"]) {
-    try {
-      const response = await fetch("https://api.zyte.com/v1/extract", { method: "POST", headers: { Authorization: auth, "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ url: productUrl, product: true, productOptions: { extractFrom, ai: true }, ...(extractFrom === "browserHtml" ? { browserHtml: true } : { httpResponseBody: true }) }) });
-      const data = await response.json();
-      const product = data?.product;
-      const price = cleanPrice(product?.price);
-      const currency = normaliseCurrency(product?.currency);
-      if (response.ok && product && price !== null && currency) return { name: product.name || null, price, currency, availability: product.availability || null, weightKg: n(product?.weight?.value ?? product?.weightKg ?? product?.weight), source: `zyte_${extractFrom}` };
-    } catch {}
-  }
-  return null;
-}
-
-async function handleProduct(request, env, url) {
-  const productUrl = url.searchParams.get("url");
-  const destination = (url.searchParams.get("destination") || "").toUpperCase().trim();
-  const quantity = url.searchParams.get("quantity") || "1";
-  if (!productUrl || !destination) return jsonResponse({ success: false, error: "Please provide a product URL and destination country." }, 400);
-  let target; try { target = new URL(productUrl); } catch { return jsonResponse({ success: false, error: "That doesn't appear to be a valid URL." }, 400); }
-  if (!ALLOWED_PROTOCOLS.has(target.protocol) || isPrivateHostname(target.hostname)) return jsonResponse({ success: false, error: "That URL cannot be accessed." }, 400);
-
-  let page;
-  try { page = await fetchRetailer(target.toString()); } catch { page = { ok: false, status: 502 }; }
-  if (!page.ok) return jsonResponse({ success: false, error: page.status === 403 ? "The retailer is blocking automated access to this product page." : `The retailer returned HTTP ${page.status}.`, needsManualPrice: true, destinationShipping: shippingRangeFor(destination), rulesVersion: RULES_VERSION }, 502);
-
-  let product = extractProductFromHtml(page.html);
-  if (!product) product = await fetchShopifyProduct(target.toString());
-  if (!product) product = await extractWithZyte(env, target.toString());
-  if (!product) return jsonResponse({ success: false, error: "We couldn't automatically find the product price.", needsManualPrice: true, destinationShipping: shippingRangeFor(destination), rulesVersion: RULES_VERSION }, 200);
-
-  const fx = await convertToGbp(product.price, product.currency);
-  if (fx.status === "unknown") return jsonResponse({ success: false, error: fx.basis, product, fx, rulesVersion: RULES_VERSION }, 200);
-  const ukShipping = await findUkShipping(page.html, page.finalUrl, product.price);
-  const destinationShipping = shippingRangeFor(destination);
-  const estimate = calculateEstimate({ productGbp: fx.amount, quantity, ukShipping, destinationShipping, destination });
-  const taxProfile = getTaxProfile(destination);
-  return jsonResponse({ success: true, product: { name: product.name, price: product.price, currency: product.currency, priceGbp: fx.amount, availability: product.availability, weightKg: product.weightKg ?? null }, fx, vatStatus: { status: "unknown", basis: "VAT inclusion is only stated as confirmed where retailer information clearly establishes it. The displayed product price is otherwise treated as the retailer's quoted price." }, taxProfile: taxProfile ? { name: taxProfile.name, taxName: taxProfile.taxName, displayRate: taxProfile.displayRate } : null, ...estimate });
-}
-
-async function handleManual(request, url) {
-  const price = cleanPrice(url.searchParams.get("price"));
-  const currency = normaliseCurrency(url.searchParams.get("currency") || "GBP");
-  const destination = (url.searchParams.get("destination") || "").toUpperCase().trim();
-  const quantity = url.searchParams.get("quantity") || "1";
-  const ukRaw = cleanPrice(url.searchParams.get("ukShipping"));
-  if (price === null || price < 0 || !destination) return jsonResponse({ success: false, error: "Please provide a valid product price and destination country." }, 400);
-  const fx = await convertToGbp(price, currency);
-  if (fx.status === "unknown") return jsonResponse({ success: false, error: fx.basis }, 200);
-  const ukShipping = ukRaw !== null ? { status: "confirmed", amount: ukRaw, basis: "UK delivery amount supplied by the customer." } : { status: "unknown", amount: null, basis: "UK delivery was not supplied and could not be established automatically." };
-  return jsonResponse({ success: true, product: { name: null, price, currency, priceGbp: fx.amount }, fx, ...calculateEstimate({ productGbp: fx.amount, quantity, ukShipping, destinationShipping: shippingRangeFor(destination), destination }) });
-}
-
-function health() {
-  return jsonResponse({ success: true, service: "get-it-send-it", rulesVersion: RULES_VERSION, status: "ok" });
-}
-
-export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
-    if (url.pathname === "/api/health") return health();
-    if (url.pathname === "/api/product" && request.method === "GET") return handleProduct(request, env, url);
-    if (url.pathname === "/api/estimate" && request.method === "GET") return handleManual(request, url);
-    return env.ASSETS.fetch(request);
-  }
-};
+export default { async fetch(request, env, ctx) { const url = new URL(request.url); if (request.method === "OPTIONS") return new Response(null, { headers: { "access-control-allow-origin": "*", "access-control-allow-methods": "GET,POST,OPTIONS", "access-control-allow-headers": "content-type" } }); if (url.pathname === "/api/health") return jsonResponse({ ok: true, rulesVersion: RULES_VERSION }); if (url.pathname === "/api/product") { if (request.method !== "GET") return jsonResponse({ error: "Method not allowed" }, 405); const target = url.searchParams.get("url"); const destination = String(url.searchParams.get("country") || "").toUpperCase(); const quantity = Math.max(1, Math.min(MAX_QUANTITY, Math.floor(n(url.searchParams.get("quantity")) || 1))); if (!target) return jsonResponse({ error: "Product URL is required." }, 400); let productUrl; try { productUrl = new URL(target); if (!ALLOWED_PROTOCOLS.has(productUrl.protocol) || isPrivateHostname(productUrl.hostname)) throw new Error("Invalid URL"); } catch { return jsonResponse({ error: "Please enter a valid public product URL." }, 400); } const product = await resolveProduct(env, productUrl.toString()); if (!product) return jsonResponse({ error: "We couldn't reliably read the product price from that page. Please check the link or request an official quote." }, 422); const converted = await convertToGbp(product.price, product.currency); if (converted.status === "unknown") return jsonResponse({ error: converted.basis }, 422); const ukShipping = await findUkShipping(productUrl.toString() ? (await fetchRetailer(productUrl.toString())).html : "", productUrl.toString(), converted.amount); const baseShipping = shippingRangeFor(destination); const estimate = calculateEstimate({ productGbp: converted.amount, quantity, ukShipping, destinationShipping: baseShipping, destination, weightKg: product.weightKg }); return jsonResponse({ success: true, product: { ...product, priceGbp: converted.amount }, fx: converted, ...estimate }); } return jsonResponse({ error: "Not found" }, 404); } };
