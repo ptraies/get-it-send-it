@@ -51,14 +51,29 @@ export default {
               const breakdown = document.getElementById('breakdown');
               if (!meta || !breakdown) return;
 
-              const quantityBadge = Array.from(meta.querySelectorAll('.badge')).find(el => /^Quantity\\s+\\d+$/i.test((el.textContent || '').trim()));
-              const match = (quantityBadge?.textContent || '').match(/\\d+/);
+              const badges = Array.from(meta.querySelectorAll('.badge'));
+              const quantityBadge = badges.find(el => /^Quantity\\b/i.test((el.textContent || '').trim()));
+              const badgeText = quantityBadge?.textContent || '';
+              const bodyText = document.body?.textContent || '';
+              const match = badgeText.match(/\\d+/) || bodyText.match(/(\\d+)\\s+identical\\s+items/i);
               if (!match) return;
 
-              quantityBadge.remove();
+              const quantity = match[1] || match[0];
+              if (quantityBadge) quantityBadge.remove();
+
               const firstRow = breakdown.querySelector('div');
               const firstLabel = firstRow?.querySelector('strong');
-              if (firstLabel) firstLabel.textContent = "Product Price (" + match[0] + " × quantity)";
+              if (firstLabel) firstLabel.textContent = `Product Price (${quantity} × quantity)`;
+
+              const allTextNodes = [];
+              const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+              let node;
+              while ((node = walker.nextNode())) allTextNodes.push(node);
+              for (const textNode of allTextNodes) {
+                if (/undefined\\s+\\d+\\s+identical\\s+items/i.test(textNode.nodeValue || '')) {
+                  textNode.nodeValue = (textNode.nodeValue || '').replace(/undefined\\s+(\\d+)\\s+identical\\s+items/gi, '$1 identical items');
+                }
+              }
             };
 
             document.addEventListener('click', event => {
