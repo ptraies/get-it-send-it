@@ -65,25 +65,28 @@ export default {
               const firstLabel = firstRow?.querySelector('strong');
               if (firstLabel) firstLabel.textContent = "Product Price (" + quantity + " × quantity)";
 
-              const allTextNodes = [];
               const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
               let node;
-              while ((node = walker.nextNode())) allTextNodes.push(node);
-              for (const textNode of allTextNodes) {
-                if (/undefined\\s+\\d+\\s+identical\\s+items/i.test(textNode.nodeValue || '')) {
-                  textNode.nodeValue = (textNode.nodeValue || '').replace(/undefined\\s+(\\d+)\\s+identical\\s+items/gi, '$1 identical items');
+              while ((node = walker.nextNode())) {
+                if (/undefined\\s+\\d+\\s+identical\\s+items/i.test(node.nodeValue || '')) {
+                  node.nodeValue = (node.nodeValue || '').replace(/undefined\\s+(\\d+)\\s+identical\\s+items/gi, '$1 identical items');
                 }
               }
             };
 
+            const runEstimateCleanup = () => {
+              setTimeout(cleanEstimateQuantity, 100);
+              setTimeout(cleanEstimateQuantity, 500);
+            };
+
             document.addEventListener('click', event => {
               const button = event.target.closest('button');
-              if (button && /official quote/i.test(button.textContent || '')) setTimeout(cleanQuoteSummary, 0);
+              if (!button) return;
+              const text = button.textContent || '';
+              if (/official quote/i.test(text)) setTimeout(cleanQuoteSummary, 100);
+              if (/estimate/i.test(text)) runEstimateCleanup();
             });
-            new MutationObserver(() => {
-              cleanQuoteSummary();
-              cleanEstimateQuantity();
-            }).observe(document.documentElement, {subtree:true, childList:true, characterData:true});
+
             cleanQuoteSummary();
             cleanEstimateQuantity();
           })();
