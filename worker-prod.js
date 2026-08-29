@@ -15,6 +15,19 @@ export default {
           );
         }
       })
+      .on("script", {
+        text(text) {
+          const chunk = text.text;
+          if (!chunk.includes("const modal=document.getElementById('quoteModal')")) return;
+          text.replace(
+            chunk.replace(
+              "document.getElementById('quoteSummary').innerHTML='<strong>'+quantity+' identical item'+(quantity===1?'':'s')+'</strong> · '+(country.options[country.selectedIndex]?.text||'Destination')+'<br>'+document.getElementById('url').value;modal.classList.add('show')",
+              "document.getElementById('quoteSummary').innerHTML='<strong>YOUR REQUEST</strong><br>'+quantity+' identical item'+(quantity===1?'':'s')+' · '+(country.options[country.selectedIndex]?.text||'Destination')+'<br><span style=\"display:block;margin-top:6px\">Product details will be verified from the link you provided.</span>';modal.classList.add('show')"
+            ),
+            true
+          );
+        }
+      })
       .transform(response);
   }
 };
