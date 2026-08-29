@@ -1,8 +1,97 @@
 import core from "./worker-clean.js";
+import { estimateInternationalShipping } from "./shipping-rates.js";
 
 export default {
   async fetch(request, env, ctx) {
     let response = await core.fetch(request, env, ctx);
+
+    // Rebuild the international-shipping part of the estimate using
+    // destination + product weight instead of the old generic country range.
+    // Keep the core worker responsible for product extraction, UK delivery,
+    // service fee and tax-profile lookup.
+    if (new URL(request.url).pathname === "/api/product" &&
+        (response.headers.get("content-type") || "").includes("application/json")) {
+      try {
+        const data = await response.clone().json();
+        if (response.ok && data?.success && data?.product) {
+          const url = new URL(request.url);
+          const destination = String(url.searchParams.get("country") || "").toUpperCase();
+          const quantity = Math.max(1, Math.min(99, Math.floor(Number(url.searchParams.get("quantity")) || 1)));
+          const shipping = estimateInternationalShipping(destination, quantity, data.product, url.searchParams.get("url") || "");
+
+          if (shipping) {
+            data.destinationShipping = shipping;
+
+            const productAmount = Number(data.product?.amount ?? data.product?.priceGbp ?? 0);
+            const fee = Number(data.serviceFee?.amount ?? 0);
+            const uk = data.ukShipping?.status === "confirmed" ? Number(data.ukShipping.amount) || 0 : 0;
+            const rateMin = Number(data.importTax?.rateMin);
+            const rateMax = Number(data.importTax?.rateMax);
+
+            if (Number.isFinite(productAmount) && Number.isFinite(fee)) {
+              const customsLow = productAmount + uk + shipping.low;
+              const customsHigh = productAmount + uk + shipping.high;
+              if (Number.isFinite(rateMin) && Number.isFinite(rateMax)) {
+                data.importTax = {
+                  ...data.importTax,
+                  status: "indicative",
+                  low: Math.round(customsLow * rateMin * 100) / 100,
+                  high: Math.round(customsHigh * rateMax * 100) / 100
+                };
+              }
+
+              const taxLow = Number(data.importTax?.low) || 0;
+              const taxHigh = Number(data.importTax?.high) || 0;
+              data.total = {
+                ...data.total,
+                status: data.unresolved?.length ? "partial" : "estimated",
+                low: Math.round((productAmount + fee + uk + shipping.low + taxLow) * 100) / 100,
+                high: Math.round((productAmount + fee + uk + shipping.high + taxHigh) * 100) / 100,
+                quantity
+              };
+            }
+
+            // A carrier-backed rate is now resolved; only the retailer -> UK
+            // leg can remain unresolved at this stage.
+            if (Array.isArray(data.unresolved)) {
+              data.unresolved = data.unresolved.filter(item => item !== "UK → destination shipping");
+            }
+            response = new Response(JSON.stringify(data), {
+              status: response.status,
+              statusText: response.statusText,
+              headers: response.headers
+            });
+          } else {
+            // No reliable product weight means we do not invent a shipping price.
+            // This is deliberately preferable to the old generic £28–£55 fallback.
+            data.destinationShipping = null;
+            data.total = {
+              ...data.total,
+              status: "partial",
+              low: null,
+              high: null,
+              quantity
+            };
+            if (!Array.isArray(data.unresolved)) data.unresolved = [];
+            if (!data.unresolved.includes("UK → destination shipping")) data.unresolved.push("UK → destination shipping");
+            data.importTax = {
+              ...data.importTax,
+              status: "unknown",
+              low: null,
+              high: null,
+              basis: "We could not establish a reliable product weight, so international postage is shown as To confirm rather than guessed."
+            };
+            response = new Response(JSON.stringify(data), {
+              status: response.status,
+              statusText: response.statusText,
+              headers: response.headers
+            });
+          }
+        }
+      } catch {
+        // Leave the core response untouched if the shipping overlay cannot run.
+      }
+    }
 
     // When run_worker_first is enabled, static assets no longer get an
     // automatic chance to handle requests. Fall back to the ASSETS binding
