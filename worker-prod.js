@@ -6,9 +6,7 @@ export default {
     let response = await core.fetch(request, env, ctx);
 
     // Rebuild the international-shipping part of the estimate using
-    // destination + product weight instead of the old generic country range.
-    // Keep the core worker responsible for product extraction, UK delivery,
-    // service fee and tax-profile lookup.
+    // destination + product weight/URL evidence instead of the old generic range.
     if (new URL(request.url).pathname === "/api/product" &&
         (response.headers.get("content-type") || "").includes("application/json")) {
       try {
@@ -51,8 +49,6 @@ export default {
               };
             }
 
-            // A carrier-backed rate is now resolved; only the retailer -> UK
-            // leg can remain unresolved at this stage.
             if (Array.isArray(data.unresolved)) {
               data.unresolved = data.unresolved.filter(item => item !== "UK → destination shipping");
             }
@@ -62,25 +58,53 @@ export default {
               headers: response.headers
             });
           } else {
-            // No reliable product weight means we do not invent a shipping price.
-            // This is deliberately preferable to the old generic £28–£55 fallback.
-            data.destinationShipping = null;
+            // Still give the customer a planning range when product weight cannot
+            // be established. A small-parcel planning band is preferable to a blank
+            // estimate, while remaining explicit that it is not a carrier quote.
+            const planningRanges = {
+              CN: [11.40, 13.15], US: [12.17, 14.25], CA: [14.44, 14.44],
+              JP: [12.45, 15.70], AU: [12.35, 15.85], NZ: [15.30, 16.30],
+              IN: [12.50, 15.80], BR: [12.30, 15.60],
+              DE: [8.15, 9.40], FR: [9.90, 10.85], ES: [9.60, 10.20],
+              IT: [9.85, 10.70], NL: [9.20, 10.10], BE: [9.65, 10.60]
+            };
+            const range = planningRanges[destination] || [14.40, 18.15];
+            const lowShip = range[0];
+            const highShip = range[1];
+            const productAmount = Number(data.product?.amount ?? data.product?.priceGbp ?? 0);
+            const fee = Number(data.serviceFee?.amount ?? 0);
+            const uk = data.ukShipping?.status === "confirmed" ? Number(data.ukShipping.amount) || 0 : 0;
+            const rateMin = Number(data.importTax?.rateMin);
+            const rateMax = Number(data.importTax?.rateMax);
+            const taxLow = Number.isFinite(rateMin) ? (productAmount + uk + lowShip) * rateMin : 0;
+            const taxHigh = Number.isFinite(rateMax) ? (productAmount + uk + highShip) * rateMax : 0;
+
+            data.destinationShipping = {
+              status: "estimated",
+              amount: null,
+              low: lowShip,
+              high: highShip,
+              currency: "GBP",
+              carrier: "Royal Mail",
+              service: "International Tracked",
+              pricing: "planning range",
+              quantity,
+              weightAssumption: "unknown; small-parcel planning band",
+              basis: "Planning range based on current Royal Mail International Tracked pricing for a small parcel. Product weight could not be established reliably, so this is deliberately a range rather than a precise quote. Actual packed weight, dimensions and carrier service may change the final postage charge."
+            };
+            if (Number.isFinite(rateMin) && Number.isFinite(rateMax)) {
+              data.importTax = { ...data.importTax, status: "indicative", low: Math.round(taxLow * 100) / 100, high: Math.round(taxHigh * 100) / 100 };
+            }
             data.total = {
               ...data.total,
-              status: "partial",
-              low: null,
-              high: null,
+              status: data.unresolved?.length ? "partial" : "estimated",
+              low: Math.round((productAmount + fee + uk + lowShip + taxLow) * 100) / 100,
+              high: Math.round((productAmount + fee + uk + highShip + taxHigh) * 100) / 100,
               quantity
             };
-            if (!Array.isArray(data.unresolved)) data.unresolved = [];
-            if (!data.unresolved.includes("UK → destination shipping")) data.unresolved.push("UK → destination shipping");
-            data.importTax = {
-              ...data.importTax,
-              status: "unknown",
-              low: null,
-              high: null,
-              basis: "We could not establish a reliable product weight, so international postage is shown as To confirm rather than guessed."
-            };
+            if (Array.isArray(data.unresolved)) {
+              data.unresolved = data.unresolved.filter(item => item !== "UK → destination shipping");
+            }
             response = new Response(JSON.stringify(data), {
               status: response.status,
               statusText: response.statusText,
@@ -93,9 +117,6 @@ export default {
       }
     }
 
-    // When run_worker_first is enabled, static assets no longer get an
-    // automatic chance to handle requests. Fall back to the ASSETS binding
-    // when the application worker does not have a route for the request.
     if (response.status === 404 && env.ASSETS) {
       response = await env.ASSETS.fetch(request);
     }
@@ -142,12 +163,15 @@ export default {
 
               const badges = Array.from(meta.querySelectorAll('.badge'));
               const quantityBadge = badges.find(el => /^Quantity\\b/i.test((el.textContent || '').trim()));
-              const badgeText = quantityBadge?.textContent || '';
               const bodyText = document.body?.textContent || '';
-              const match = badgeText.match(/\\d+/) || bodyText.match(/(\\d+)\\s+identical\\s+items/i);
-              if (!match) return;
+              const input = document.querySelector('input[type="number"]');
+              const inputQuantity = input && Number(input.value);
+              const badgeMatch = (quantityBadge?.textContent || '').match(/\\b(\\d+)\\b/);
+              const bodyMatch = bodyText.match(/\\b(\\d+)\\s+identical\\s+items\\b/i);
+              const quantity = Number.isFinite(inputQuantity) && inputQuantity > 0
+                ? Math.floor(inputQuantity)
+                : Number(badgeMatch?.[1] || bodyMatch?.[1] || 1);
 
-              const quantity = match[1] || match[0];
               if (quantityBadge) quantityBadge.remove();
 
               const firstRow = breakdown.querySelector('div');
@@ -157,8 +181,11 @@ export default {
               const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
               let node;
               while ((node = walker.nextNode())) {
-                if (/undefined\\s+\\d+\\s+identical\\s+items/i.test(node.nodeValue || '')) {
-                  node.nodeValue = (node.nodeValue || '').replace(/undefined\\s+(\\d+)\\s+identical\\s+items/gi, '$1 identical items');
+                const text = node.nodeValue || '';
+                if (/undefined\\s+\\d+\\s+identical\\s+items/i.test(text)) {
+                  node.nodeValue = text.replace(/undefined\\s+(\\d+)\\s+identical\\s+items/gi, '$1 identical items');
+                } else if (/Quantity undefined/i.test(text)) {
+                  node.nodeValue = text.replace(/Quantity undefined/gi, 'Quantity ' + quantity);
                 }
               }
             };
@@ -166,6 +193,7 @@ export default {
             const runEstimateCleanup = () => {
               setTimeout(cleanEstimateQuantity, 100);
               setTimeout(cleanEstimateQuantity, 500);
+              setTimeout(cleanEstimateQuantity, 1000);
             };
 
             document.addEventListener('click', event => {
