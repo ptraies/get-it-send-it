@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "get-it-send-it",
-  "main": "worker-v13.js",
+  "main": "worker-v14.js",
   "compatibility_date": "2026-08-28",
   "browser": { "binding": "BROWSER" },
   "assets": { "directory": ".", "binding": "ASSETS", "run_worker_first": true },
