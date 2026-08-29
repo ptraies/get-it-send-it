@@ -2,7 +2,15 @@ import core from "./worker-clean.js";
 
 export default {
   async fetch(request, env, ctx) {
-    const response = await core.fetch(request, env, ctx);
+    let response = await core.fetch(request, env, ctx);
+
+    // When run_worker_first is enabled, static assets no longer get an
+    // automatic chance to handle requests. Fall back to the ASSETS binding
+    // when the application worker does not have a route for the request.
+    if (response.status === 404 && env.ASSETS) {
+      response = await env.ASSETS.fetch(request);
+    }
+
     const contentType = response.headers.get("content-type") || "";
     if (!contentType.includes("text/html")) return response;
 
