@@ -13,8 +13,8 @@ export default {
         `<style>
           body{padding-top:12px!important}
           header{padding-top:32px!important}
-          .live-box .live-dot{animation:livePulse 1.1s ease-in-out infinite!important;transform-origin:center}
-          @keyframes livePulse{0%,100%{transform:scale(.78);opacity:.4;box-shadow:0 0 0 2px #E8F6EC}50%{transform:scale(1.18);opacity:1;box-shadow:0 0 0 7px #E8F6EC}}
+          .live-box .live-dot{animation:livePulse 1.2s ease-in-out infinite!important;transform-origin:center;will-change:transform,opacity,box-shadow}
+          @keyframes livePulse{0%,100%{transform:scale(.68);opacity:.35;box-shadow:0 0 0 0 rgba(53,165,91,0)}50%{transform:scale(1.25);opacity:1;box-shadow:0 0 0 7px rgba(232,246,236,.95)}}
         </style></head>`
       )
       .replace(
