@@ -63,7 +63,7 @@ async function fetchFeed(feed) {
     if (!response.ok) return [];
     const xml = await response.text();
     return parseItems(xml, feed.source)
-      .map(item => ({ ...item, source: normaliseSource(item, feed) }))
+      .map(item => ({ ...item, source: normaliseSource(item, feed), sourceType: feed.source }))
       .filter(item => isAllowedSource(item, feed));
   } catch { return []; }
 }
@@ -78,15 +78,15 @@ export async function getNews() {
     return true;
   });
   unique.sort((a, b) => score(b) - score(a));
-  return unique.slice(0, 6);
+  return unique.slice(0, 6).map(item => ({ ...item, live: true }));
 }
 
 export function newsResponse(items) {
-  return new Response(JSON.stringify({ success: true, updatedAt: new Date().toISOString(), items }), {
+  return new Response(JSON.stringify({ success: true, updatedAt: new Date().toISOString(), items, sources: FEEDS.map(feed => feed.source) }), {
     headers: { "content-type": "application/json; charset=UTF-8", "cache-control": "public, max-age=900, s-maxage=900", "access-control-allow-origin": "*" },
   });
 }
 
 export function newsErrorResponse() {
-  return new Response(JSON.stringify({ success: false, items: [] }), { status: 502, headers: { "content-type": "application/json; charset=UTF-8", "cache-control": "no-store", "access-control-allow-origin": "*" } });
+  return new Response(JSON.stringify({ success: false, items: [], sources: FEEDS.map(feed => feed.source) }), { status: 502, headers: { "content-type": "application/json; charset=UTF-8", "cache-control": "no-store", "access-control-allow-origin": "*" } });
 }
