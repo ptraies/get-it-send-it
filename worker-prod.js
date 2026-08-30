@@ -1,18 +1,32 @@
 import core from "./worker-clean.js";
 import { estimateInternationalShipping } from "./shipping-rates.js";
+import { getNews, newsResponse, newsErrorResponse } from "./news-feed.js";
 
 export default {
   async fetch(request, env, ctx) {
+    const requestUrl = new URL(request.url);
+
+    // Live tax/import news endpoint. The feed is sourced from publisher results
+    // and filtered server-side to keep the customer-facing panel relevant.
+    if (requestUrl.pathname === "/api/news") {
+      try {
+        const items = await getNews();
+        return newsResponse(items);
+      } catch {
+        return newsErrorResponse();
+      }
+    }
+
     let response = await core.fetch(request, env, ctx);
 
     // Rebuild the international-shipping part of the estimate using
     // destination + product weight/URL evidence instead of the old generic range.
-    if (new URL(request.url).pathname === "/api/product" &&
+    if (requestUrl.pathname === "/api/product" &&
         (response.headers.get("content-type") || "").includes("application/json")) {
       try {
         const data = await response.clone().json();
         if (response.ok && data?.success && data?.product) {
-          const url = new URL(request.url);
+          const url = requestUrl;
           const destination = String(url.searchParams.get("country") || "").toUpperCase();
           const quantity = Math.max(1, Math.min(99, Math.floor(Number(url.searchParams.get("quantity")) || 1)));
           const shipping = estimateInternationalShipping(destination, quantity, data.product, url.searchParams.get("url") || "");
@@ -116,6 +130,44 @@ export default {
     }
   };
 
+  const loadLiveNews = async () => {
+    try {
+      const response = await fetch('/api/news', { cache: 'no-store' });
+      if (!response.ok) throw new Error('News request failed');
+      const data = await response.json();
+      if (!data?.success || !Array.isArray(data.items) || !data.items.length) return;
+      const heading = Array.from(document.querySelectorAll('h2,h3,h4')).find(el => /Recent changes/i.test(el.textContent || ''));
+      if (!heading) return;
+      const list = heading.nextElementSibling;
+      const container = list?.parentElement;
+      if (!container) return;
+      const oldItems = Array.from(container.children).filter(el => el !== heading && !/How we research/i.test(el.textContent || ''));
+      oldItems.forEach(el => el.remove());
+      data.items.slice(0, 5).forEach(item => {
+        const article = document.createElement('article');
+        article.className = 'news-item';
+        article.style.padding = '14px 0';
+        article.style.borderBottom = '1px solid #eee';
+        const title = document.createElement('a');
+        title.href = item.link;
+        title.target = '_blank';
+        title.rel = 'noopener noreferrer';
+        title.textContent = item.title;
+        title.style.cssText = 'display:block;color:#16458f;font-weight:800;font-size:16px;text-decoration:none;line-height:1.2';
+        const meta = document.createElement('div');
+        meta.textContent = `${item.source || 'Source'}${item.date ? ' · ' + new Date(item.date).toLocaleDateString('en-GB', {day:'numeric',month:'long',year:'numeric'}) : ''}`;
+        meta.style.cssText = 'margin-top:6px;font-size:11px;color:#777;text-transform:uppercase;letter-spacing:.08em;font-weight:700';
+        const text = document.createElement('div');
+        text.textContent = item.description || 'Tax, customs or import development relevant to cross-border buying.';
+        text.style.cssText = 'margin-top:7px;font-size:13px;line-height:1.45;color:#68717c';
+        article.append(title, meta, text);
+        heading.parentElement.insertBefore(article, heading.parentElement.querySelector('h2,h3,h4')?.nextSibling || null);
+      });
+    } catch {
+      // Keep the existing static news panel if the live feed is unavailable.
+    }
+  };
+
   const runEstimateCleanup = () => {
     setTimeout(cleanEstimateQuantity, 100);
     setTimeout(cleanEstimateQuantity, 600);
@@ -132,6 +184,7 @@ export default {
 
   cleanQuoteSummary();
   cleanEstimateQuantity();
+  loadLiveNews();
 })();
 </script></body>`);
 
