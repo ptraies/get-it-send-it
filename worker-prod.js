@@ -51,7 +51,7 @@ export default {
     const html = await response.text();
     const updatedHtml = html
       .replace("</head>", `<style>
-body{padding-top:12px!important}header{padding-top:32px!important}
+body{padding-top:6px!important}header{padding-top:32px!important}
 .live-box .live-dot{display:inline-block!important;animation:livePulse 1.2s ease-in-out infinite!important;transform-origin:center;will-change:transform,opacity,box-shadow}
 @keyframes livePulse{0%,100%{transform:scale(.68);opacity:.35;box-shadow:0 0 0 0 rgba(53,165,91,0)}50%{transform:scale(1.25);opacity:1;box-shadow:0 0 0 7px rgba(232,246,236,.95)}}
 .news-live-wrap{margin-top:8px}.news-live-status{display:flex;align-items:center;gap:8px;color:#16458f;font-weight:800}.news-live-dot{width:9px;height:9px;border-radius:50%;background:#35a55b;display:inline-block;animation:livePulse 1.2s ease-in-out infinite}.news-source-line{margin-top:6px;font-size:11px;color:#777;text-transform:uppercase;letter-spacing:.08em;font-weight:700}.news-source-line a{color:#777;text-decoration:underline;text-underline-offset:2px}.news-item a:hover{text-decoration:underline!important}.news-feed-footer{margin-top:18px;padding-top:14px;border-top:1px solid #ddd;font-size:12px;line-height:1.5;color:#707984}.news-feed-footer strong{color:#3f4a57}
