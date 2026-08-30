@@ -1,10 +1,11 @@
 const FEEDS = [
   { source: "PwC", query: "site:pwc.com (customs OR VAT OR import OR e-commerce OR indirect tax)", sourceDomains: ["pwc.com"] },
-  { source: "GOV.UK", query: "site:gov.uk (customs OR VAT OR import OR duty)", sourceDomains: ["gov.uk"] },
+  { source: "GOV.UK", query: "site:gov.uk (customs OR VAT OR import OR duty OR tariff)", sourceDomains: ["gov.uk"] },
+  { source: "GOV.UK", query: "site:gov.uk \"low value imports\" OR site:gov.uk \"cheap import reforms\"", sourceDomains: ["gov.uk"] },
   { source: "KPMG", query: "site:kpmg.com (customs OR VAT OR import OR e-commerce)", sourceDomains: ["kpmg.com"] },
 ];
 
-const MAX_AGE_MS = 45 * 24 * 60 * 60 * 1000;
+const MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
 
 function stripHtml(value) { return String(value || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(); }
 function decodeEntities(value) { return String(value || "").replace(/<!\[CDATA\[([\s\S]*?)\]\]>/gi, "$1").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">"); }
@@ -48,11 +49,12 @@ function isAllowedSource(item, feed) {
 function score(item) {
   const text = `${item.title} ${item.description}`.toLowerCase();
   let value = 0;
-  if (/customs|duty|tariff/.test(text)) value += 5;
-  if (/import|vat|gst/.test(text)) value += 4;
-  if (/e-commerce|ecommerce|online seller|low.?value|distance sale/.test(text)) value += 4;
+  if (/customs|duty|tariff/.test(text)) value += 6;
+  if (/import|vat|gst/.test(text)) value += 5;
+  if (/low.?value|£135|135|cheap import/.test(text)) value += 8;
+  if (/e-commerce|ecommerce|online seller|distance sale/.test(text)) value += 5;
   if (/shipping|parcel|delivery|postal/.test(text)) value += 2;
-  if (item.date) value += Math.max(0, 10 - Math.floor((Date.now() - new Date(item.date).getTime()) / 86400000));
+  if (item.date) value += Math.max(0, 14 - Math.floor((Date.now() - new Date(item.date).getTime()) / 86400000));
   return value;
 }
 
