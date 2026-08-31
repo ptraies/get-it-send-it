@@ -1,14 +1,10 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "get-it-send-it",
-  "main": "worker-entry.js",
+  "main": "worker-prod.js",
   "compatibility_date": "2026-08-29",
   "browser": { "binding": "BROWSER" },
-  "assets": {
-    "directory": ".",
-    "binding": "ASSETS",
-    "run_worker_first": true
-  },
+  "assets": { "directory": ".", "binding": "ASSETS" },
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1,
