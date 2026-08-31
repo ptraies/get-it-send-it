@@ -120,10 +120,10 @@ function applyShippingAndTotals(data, requestUrl) {
 function injectUi(html) {
   const styles = `<style>
 body{padding-top:6px!important}header{padding-top:32px!important}
-.live-box .live-dot{display:inline-block!important;animation:livePulse 1.2s ease-in-out infinite!important;transform-origin:center;will-change:transform,opacity,box-shadow}
-@keyframes livePulse{0%,100%{transform:scale(.68);opacity:.35;box-shadow:0 0 0 0 rgba(53,165,91,0)}50%{transform:scale(1.25);opacity:1;box-shadow:0 0 0 7px rgba(232,246,236,.95)}}
+.live-box .live-dot{display:inline-block!important;width:9px!important;height:9px!important;border-radius:50%!important;background:#35a55b!important;box-shadow:0 0 0 0 rgba(53,165,91,0)!important;animation:livePulse 1.2s ease-in-out infinite!important;transform-origin:center!important;will-change:transform,opacity,box-shadow!important}
+@keyframes livePulse{0%,100%{transform:scale(.72);opacity:.42;box-shadow:0 0 0 0 rgba(53,165,91,0)}50%{transform:scale(1.18);opacity:1;box-shadow:0 0 0 6px rgba(232,246,236,.9)}}
 .news-source-line{margin-top:6px;font-size:11px;color:#777;text-transform:uppercase;letter-spacing:.08em;font-weight:700}.news-source-line a{color:#777;text-decoration:underline;text-underline-offset:2px}.news-item a:hover{text-decoration:underline!important}.news-item{padding:12px 0!important}.news-item-title{font-size:15px!important;line-height:1.2!important}.news-item-text{font-size:12px!important;line-height:1.4!important}
-.estimate-feedback{margin-top:18px;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow)}.estimate-feedback-label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;font-weight:850;color:var(--orange);margin-bottom:9px}.estimate-feedback-question{font:700 20px/1.15 var(--serif);color:var(--cobalt);margin-bottom:12px}.feedback-actions{display:flex;gap:10px}.feedback-btn{flex:1;border:1px solid #CFC9BC;border-radius:10px;background:#fff;padding:10px 12px;color:var(--cobalt);font-weight:800;cursor:pointer}.feedback-btn:hover{border-color:var(--cobalt)}.feedback-btn.yes{color:#17733C}.feedback-btn.no{color:#9C421D}.feedback-reasons{display:none;margin-top:12px}.feedback-reasons.show{display:block}.feedback-reasons p{font-size:12px;color:#68717C;margin:0 0 8px}.feedback-reason{border:0;background:none;color:var(--cobalt);font-size:12px;font-weight:800;padding:5px 8px 5px 0;cursor:pointer}.feedback-thanks{display:none;margin-top:10px;font-size:12px;color:#68717C}.feedback-thanks.show{display:block}
+.estimate-feedback{margin-top:14px;margin-bottom:16px;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow)}.estimate-feedback-label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;font-weight:850;color:var(--orange);margin-bottom:9px}.estimate-feedback-question{font:700 20px/1.15 var(--serif);color:var(--cobalt);margin-bottom:12px}.feedback-actions{display:flex;gap:10px}.feedback-btn{flex:1;border:1px solid #CFC9BC;border-radius:10px;background:#fff;padding:10px 12px;color:var(--cobalt);font-weight:800;cursor:pointer}.feedback-btn:hover{border-color:var(--cobalt)}.feedback-btn.yes{color:#17733C}.feedback-btn.no{color:#9C421D}.feedback-reasons{display:none;margin-top:12px}.feedback-reasons.show{display:block}.feedback-reasons p{font-size:12px;color:#68717C;margin:0 0 8px}.feedback-reason{border:0;background:none;color:var(--cobalt);font-size:12px;font-weight:800;padding:5px 8px 5px 0;cursor:pointer}.feedback-thanks{display:none;margin-top:10px;font-size:12px;color:#68717C}.feedback-thanks.show{display:block}
 </style>`;
 
   const script = `<script>
@@ -147,7 +147,8 @@ body{padding-top:6px!important}header{padding-top:32px!important}
     if(!news||document.getElementById('estimateFeedback'))return null;
     const card=document.createElement('div');card.id='estimateFeedback';card.className='estimate-feedback';
     card.innerHTML='<div class="estimate-feedback-label">Your feedback</div><div class="estimate-feedback-question">Was this estimate helpful?</div><div class="feedback-actions"><button type="button" class="feedback-btn yes" data-feedback="yes">👍 Yes</button><button type="button" class="feedback-btn no" data-feedback="no">👎 No</button></div><div class="feedback-reasons"><p>What seemed wrong?</p><button type="button" class="feedback-reason" data-reason="shipping">Shipping</button><button type="button" class="feedback-reason" data-reason="product">Product price</button><button type="button" class="feedback-reason" data-reason="tax">Tax</button><button type="button" class="feedback-reason" data-reason="other">Something else</button></div><div class="feedback-thanks">Thanks — that helps us improve the estimator.</div>';
-    news.appendChild(card);
+    const source=news.querySelector('.news-source');
+    if(source)news.insertBefore(card,source);else news.appendChild(card);
     card.addEventListener('click',async e=>{const b=e.target.closest('[data-feedback],[data-reason]');if(!b)return;if(b.dataset.feedback==='no')card.querySelector('.feedback-reasons').classList.add('show');if(b.dataset.feedback==='yes'||b.dataset.reason){const p=feedbackContext();p.feedback=b.dataset.feedback||'no';if(b.dataset.reason)p.reason=b.dataset.reason;await sendFeedback(p);card.querySelector('.feedback-actions').innerHTML='<div class="feedback-thanks show">Thanks — that helps us improve the estimator.</div>';card.querySelector('.feedback-reasons').classList.remove('show')}});
     return card;
   };
@@ -164,7 +165,7 @@ body{padding-top:6px!important}header{padding-top:32px!important}
       const footer=document.createElement('div');footer.className='news-feed-footer';footer.innerHTML='<strong>Live sources:</strong> PwC · GOV.UK · KPMG. Stories are checked automatically and linked to the original publisher. This is a planning feed, not legal or customs advice.';section.appendChild(footer);
     }catch{}
   };
-  const runCleanup=()=>{setTimeout(cleanEstimate,100);setTimeout(cleanEstimate,600);setTimeout(cleanEstimate,1200);setTimeout(ensureFeedback,150)};
+  const runCleanup=()=>{setTimeout(cleanEstimate,100);setTimeout(cleanEstimate,600);setTimeout(cleanEstimate,1200);setTimeout(ensureFeedback,200)};
   document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(/estimate/i.test(b.textContent||''))runCleanup()});
   cleanEstimate();ensureFeedback();loadLiveNews();
 })();
@@ -224,10 +225,7 @@ export default {
     if (request.method === "GET" && url.pathname === "/api/product" && (response.headers.get("content-type") || "").includes("application/json")) {
       try {
         const data = await response.clone().json();
-        if (response.ok && data?.success && data?.product) {
-          const updated = applyShippingAndTotals(data, url);
-          response = json(updated, response.status);
-        }
+        if (response.ok && data?.success && data?.product) response = json(applyShippingAndTotals(data, url), response.status);
       } catch {}
     }
 
